@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "sourceMap": true,
+    "target": "es5",
+    "module": "es2015"
+  }
+}
