@@ -1,7 +1,6 @@
 {
   "name": "sawakai",
   "version": "0.1.0",
-  "private": true,
   "description": "",
   "main": "src/index.ts",
   "scripts": {
@@ -19,9 +18,17 @@
   },
   "homepage": "https://github.com/sawakai/sawakai#readme",
   "devDependencies": {
+    "@cycle/dom": "^22.6.0",
+    "@cycle/run": "^5.4.0",
+    "css-loader": "^3.5.2",
+    "sass": "^1.26.3",
+    "sass-loader": "^8.0.2",
+    "style-loader": "^1.1.4",
     "ts-loader": "^7.0.0",
     "typescript": "^3.8.3",
     "webpack": "^4.42.1",
-    "webpack-cli": "^3.3.11"
-  }
+    "webpack-cli": "^3.3.11",
+    "xstream": "^11.11.0"
+  },
+  "dependencies": {}
 }
