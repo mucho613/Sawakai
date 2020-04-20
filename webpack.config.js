@@ -1,9 +1,15 @@
 const MODE = "development";
 const enabledSourceMap = MODE === "development";
 
+const path = require('path');
+const outputPath = path.resolve(__dirname, 'public');
+
 module.exports = {
   mode: MODE,
   entry: './src/index.ts',
+  devServer: {
+    contentBase: outputPath
+  },
   module: {
     rules: [
       {
@@ -38,5 +44,5 @@ module.exports = {
   },
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".json"]
-  },
+  }
 };

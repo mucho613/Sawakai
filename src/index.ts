@@ -9,7 +9,7 @@ function main(sources) {
 
   const vdom$ = name$.map(name =>
     div([
-      label('Name:'),
+      label('Name: '),
       input('.field', {attrs: {type: 'text'}}),
       hr(),
       h1('Hello ' + name),

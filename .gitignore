@@ -3,4 +3,4 @@ build/
 .nyc_output/
 node_modules/
 coverage/
-public/index.html
+public/main.js
