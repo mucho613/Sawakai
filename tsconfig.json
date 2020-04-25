@@ -3,6 +3,9 @@
     "sourceMap": true,
     "target": "es5",
     "module": "es2015",
+    "jsx": "react",
+    "jsxFactory": "Snabbdom.createElement",
+    "strict": true,
     "moduleResolution": "node",
     "lib": [
       "es2020",
