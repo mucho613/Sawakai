@@ -6,7 +6,9 @@
   "scripts": {
     "start": "webpack-dev-server --open",
     "build": "webpack",
-    "watch": "webpack -w"
+    "watch": "webpack -w",
+    "lint": "eslint \"src/*\"",
+    "fix": "eslint \"src/*\" --fix"
   },
   "repository": {
     "type": "git",
@@ -21,7 +23,13 @@
   "devDependencies": {
     "@cycle/dom": "^22.6.0",
     "@cycle/run": "^5.4.0",
+    "@typescript-eslint/eslint-plugin": "^2.29.0",
+    "@typescript-eslint/parser": "^2.29.0",
     "css-loader": "^3.5.2",
+    "eslint": "^6.8.0",
+    "eslint-config-prettier": "^6.11.0",
+    "eslint-plugin-prettier": "^3.1.3",
+    "prettier": "^2.0.5",
     "sass": "^1.26.3",
     "sass-loader": "^8.0.2",
     "style-loader": "^1.1.4",

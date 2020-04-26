@@ -1,22 +1,22 @@
-import {run} from '@cycle/run'
-import {div, label, input, hr, h1, makeDOMDriver} from '@cycle/dom'
+import { run } from "@cycle/run";
+import { div, label, input, hr, h1, makeDOMDriver } from "@cycle/dom";
 import "./scss/style.scss";
 
-function main(sources) {
-  const input$ = sources.DOM.select('.field').events('input')
+function main(sources): unknown {
+  const input$ = sources.DOM.select(".field").events("input");
 
-  const name$ = input$.map(ev => ev.target.value).startWith('')
+  const name$ = input$.map((ev) => ev.target.value).startWith("");
 
-  const vdom$ = name$.map(name =>
+  const vdom$ = name$.map((name) =>
     div([
-      label('Name: '),
-      input('.field', {attrs: {type: 'text'}}),
+      label("Name: "),
+      input(".field", { attrs: { type: "text" } }),
       hr(),
-      h1('Hello ' + name),
+      h1("Hello " + name),
     ])
-  )
+  );
 
-  return { DOM: vdom$ }
+  return { DOM: vdom$ };
 }
 
-run(main, { DOM: makeDOMDriver('#app') })
+run(main, { DOM: makeDOMDriver("#app") });
