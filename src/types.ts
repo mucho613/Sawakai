@@ -1,36 +1,34 @@
-import { Stream } from 'xstream'
-import { Int } from './int'
+import { Stream } from "xstream";
+import { Int } from "./int";
 
 export type Component<So, Si> = (sources: So) => Si;
 
-export type Env = {
-    
-};
+export type Env = {};
 
 export type GameData = {
-    gameUserID: string;
-    gameClientID: string;
-    position: Position;
-    faceRotation: Quaternion;
+  gameUserID: string;
+  gameClientID: string;
+  position: Position;
+  faceRotation: Quaternion;
 };
 
 export type Position = {
-    x: number;
-    y: number;
-    z: number;
+  x: number;
+  y: number;
+  z: number;
 };
 
 export type Quaternion = {
-    x: number;
-    y: number;
-    z: number;
-    w: number;
-}
+  x: number;
+  y: number;
+  z: number;
+  w: number;
+};
 
 export type UserData = {
-    userID: UserID;
-    minecraftID: MinecraftID;
-    voice: Voice;
+  userID: UserID;
+  minecraftID: MinecraftID;
+  voice: Voice;
 };
 
 export type MinecraftID = string;

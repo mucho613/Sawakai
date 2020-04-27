@@ -1,5 +1,7 @@
 export type Int = {
-    toNum: number;
-}
+  toNum: number;
+};
 
-export function int(i: number): Int { return { toNum: i|0 }; }
+export function int(i: number): Int {
+  return { toNum: i | 0 };
+}
