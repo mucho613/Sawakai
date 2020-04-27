@@ -18,5 +18,7 @@
         "tsconfigRootDir": ".",
         "project": "./tsconfig.json"
     },
-    "rules": {}
+    "rules": {
+      "indent": ["error", 2]
+    }
   }
