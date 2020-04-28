@@ -1,4 +1,5 @@
 import xs, { Stream } from "xstream";
+import { flattenCuncurrently } from "xstream/extra/flattenConcurrently";
 import * as D from "@cycle/dom";
 import { Reducer } from "@cycle/state";
 import * as Snabbdom from "snabbdom-pragma";
@@ -35,9 +36,8 @@ export function AppMockInner(sources: Sources): Sinks {
     }))
   );
   const s0 = { userList: [] };
-  // TODO: flattenだと思い通りの動作にならない
   const siState = xs
-    .merge(removeUser$.flatten(), addUser$)
+    .merge(flattenConcurrently(removeUser$), addUser$)
     .map(U.toReducer<State>(s0));
   function show(d: UserData): D.VNode {
     return <h1>{d.minecraftID}</h1>;
