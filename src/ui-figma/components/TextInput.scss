@@ -1,0 +1,18 @@
+.text-input {
+  position: relative;
+  width: 578px;
+  height: 88px;
+
+  input {
+    position: absolute;
+    left: 0%;
+    right: 0%;
+    top: 0%;
+    bottom: 0%;
+
+    background: #FFFFFF;
+    border: 1px solid #000000;
+    box-sizing: border-box;
+    border-radius: 100px;
+  }
+}
