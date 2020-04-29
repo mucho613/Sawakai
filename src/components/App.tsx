@@ -10,6 +10,7 @@ import * as UCon from "../effects/UserConnections";
 import * as Audio from "../effects/Audio";
 import * as StateE from "../effects/State";
 import * as U from "../util";
+import { WorldIDInputModal } from "../ui-figma/WorldIDInputModal";
 
 // 状態はなるべく一箇所に固めない
 export type State = {
@@ -24,6 +25,10 @@ type Sinks = DOM.NamedSi &
   /*Game.NamedSi & Audio.NamedSi & */ StateE.NamedSi<State>;
 
 export function AppMockInner(sources: Sources): Sinks {
+  function f(x: number, y: number): number {
+    return x + y;
+  }
+  //console.log(curried(f)(1)(2));
   const soUCon = UCon.getSo(sources);
   const soState = StateE.getSo(sources);
   const state$ = soState.stream;
@@ -42,7 +47,8 @@ export function AppMockInner(sources: Sources): Sinks {
   function show(d: UserData): D.VNode {
     return <h1>{d.minecraftID}</h1>;
   }
-  const siDOM = state$.map((s: State) => D.div(s.userList.map(show)));
+  //const siDOM = state$.map((s: State) => D.div(s.userList.map(show)));
+  const siDOM = xs.of(WorldIDInputModal);
   const siUCon = xs.of({
     minecraftID: "winjii",
     userID: "winjii",
