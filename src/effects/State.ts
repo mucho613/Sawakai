@@ -36,17 +36,5 @@ export function run<
   Sos extends NamedSo<State>,
   Sis extends NamedSi<State>
 >(component: Component<Sos, Sis>): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
-  return withState<Sos, Sis, State>(component);
+  return withState<Sos, Sis, State, Name>(component, name);
 }
-
-// interface C { value: number }
-// interface A extends C { value: number }
-// type B = C & { value: string }
-
-// U.Named<'State', Source<State>> -> { State: Source<State>}
-
-// Source = { DOM: DOMSource }
-// Sink = { DOM: Stream<VNode> }
-
-// Source = { state: StateSource<State> }
-// Sink = { state: Stream<Reducer<State>> }

@@ -80,7 +80,6 @@ export function runMock<So extends NamedSo, Si extends NamedSi>(
       stop: () => window.clearInterval(id),
     };
     const soUCon: Source = xs.create(producer);
-    console.log({ UserConnection: soUCon });
     const sinks = component({ ...sources, ...nameSo(soUCon) } as So);
     return { ...sinks }; //siUConはとりあえず捨てる
   };

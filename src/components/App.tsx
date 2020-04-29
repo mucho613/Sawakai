@@ -1,5 +1,5 @@
 import xs, { Stream } from "xstream";
-import { flattenCuncurrently } from "xstream/extra/flattenConcurrently";
+import flattenConcurrently from "xstream/extra/flattenConcurrently";
 import * as D from "@cycle/dom";
 import { Reducer } from "@cycle/state";
 import * as Snabbdom from "snabbdom-pragma";
