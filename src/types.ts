@@ -8,21 +8,23 @@ export type Env = {};
 export type GameData = {
   gameUserID: string;
   gameClientID: string;
-  position: Position;
-  faceRotation: Quaternion;
+  pose: Pose;
 };
 
-export type Position = {
+export type Pose = {
+  pos: Position;
+  faceDir: FaceDirection;
+  headDir: HeadDirection;
+};
+
+export type Position = Vector3;
+export type FaceDirection = Vector3;
+export type HeadDirection = Vector3;
+
+export type Vector3 = {
   x: number;
   y: number;
   z: number;
-};
-
-export type Quaternion = {
-  x: number;
-  y: number;
-  z: number;
-  w: number;
 };
 
 export type UserData = {
@@ -36,3 +38,9 @@ export type GameUserID = string;
 export type Voice = MediaStream;
 
 export type UserID = string;
+
+export type AudioID = string;
+
+export function toString(userID: UserID): string {
+  return userID;
+}
