@@ -7,8 +7,8 @@
     "start": "webpack-dev-server --open",
     "build": "webpack",
     "watch": "webpack -w",
-    "lint": "eslint \"src/*\"",
-    "fix": "eslint \"src/*\" --fix"
+    "lint": "eslint \"src/**/*@(.ts|.tsx)\"",
+    "fix": "eslint \"src/**/*@(.ts|.tsx)\" --fix"
   },
   "repository": {
     "type": "git",
