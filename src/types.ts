@@ -27,12 +27,12 @@ export type Quaternion = {
 
 export type UserData = {
   userID: UserID;
-  minecraftID: MinecraftID;
+  gameUserID: GameUserID;
   voice: Voice;
 };
 
-export type MinecraftID = string;
+export type GameUserID = string;
 
-export type Voice = {};
+export type Voice = MediaStream;
 
 export type UserID = string;

@@ -3,8 +3,10 @@ import "./TextInput.scss";
 import * as Snabbdom from "snabbdom-pragma";
 import { VNode } from "@cycle/dom";
 
-export const TextInput: VNode = (
-  <div className="text-input">
-    <input type="text" />
-  </div>
-);
+export function TextInput(placeholder: string): VNode {
+  return (
+    <div className="text-input">
+      <input type="text" placeholder={placeholder} />
+    </div>
+  );
+}

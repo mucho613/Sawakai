@@ -23,9 +23,9 @@ export function run<Env, Sos extends NamedSo<Env>, Sis>(
   env: Env,
   component: Component<Sos, Sis>
 ): Component<Omit<Sos, Name>, Sis> {
-  return (sources) => {
+  return function (sources: Omit<Sos, Name>): Sis {
     // 仕方なくas Sosしている
     // 参照: https://github.com/microsoft/TypeScript/issues/35858
-    return component({ ...sources, [name]: env } as Sos);
+    return component({ ...sources, ...nameSo(env) } as Sos);
   };
 }
