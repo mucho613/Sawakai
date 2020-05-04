@@ -50,7 +50,7 @@ export function App(sources: Sources): Sinks {
   );
   const clickNext$ = domSo
     .select(".go-button")
-    .events("onclick");
+    .events("click");
   const showingGIDInput$: Stream<boolean> = clickNext$
     .mapTo(false)
     .startWith(true);
