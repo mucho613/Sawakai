@@ -1,7 +1,6 @@
 import { Stream } from "xstream";
 import { StateSource, Reducer, withState } from "@cycle/state";
 import { Component } from "../types";
-import * as U from "./util";
 
 export type Source<State> = StateSource<State>;
 export type Sink<State> = Stream<Reducer<State>>;

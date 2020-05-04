@@ -1,72 +1,31 @@
 .text-input-modal {
-  position: relative;
-  // width: 1351px;
-  // height: 889px;
-
-  background: #FFFFFF;
-
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  #discription-container {
+    position: relative;
+    flex: 1;
+    align-self: stretch;
+  }
   .discription {
     position: absolute;
-    width: 578px;
-    height: 179px;
-    left: calc(50% - 578px/2 - 0.5px);
-    top: calc(50% - 179px/2 - 163px);
+    bottom: 0;
+    width: 100%;
+    margin-bottom: 20px;
 
     font-family: Roboto;
     font-style: normal;
     font-weight: normal;
     font-size: 18px;
     line-height: 21px;
-    display: flex;
-    align-items: flex-end;
     text-align: center;
 
     color: #000000;
   }
-
-  .layout {
-    /* Auto Layout */
-
-    display: flex;
-    flex-direction: column;
-    padding: 0px 202px;
-
-    position: absolute;
-    width: 676px;
-    height: 212px;
-    left: calc(50% - 676px/2 - 0.5px);
-    top: calc(50% - 212px/2 + 77.5px);
-
-    .text-input {
-      position: static;
-      width: 578px;
-      height: 88px;
-      left: 49px;
-      top: 0px;
-
-
-      /* Inside Auto Layout */
-
-      flex: none;
-      order: 0;
-      align-self: center;
-      margin: 0px 42px;
-    }
-
-    .go-bottun {
-      position: static;
-      width: 360px;
-      height: 82px;
-      left: calc(50% - 360px/2);
-      top: calc(50% - 82px/2 + 65px);
-
-
-      /* Inside Auto Layout */
-
-      flex: none;
-      order: 1;
-      align-self: center;
-      margin: 0px 42px;
-    }
+  .go-button {
+    flex: 1;
   }
 }

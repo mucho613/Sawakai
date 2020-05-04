@@ -5,14 +5,18 @@ import { VNode } from "@cycle/dom";
 import { GoButton } from "./GoButton";
 import { TextInput } from "./TextInput";
 
-export function TextInputModal(description: string, goText: string): VNode {
+export function TextInputModal(
+  description: string,
+  goText: string,
+  placeholder: string
+): VNode {
   return (
     <div className="text-input-modal">
-      <div className="layout">
-        {TextInput}
-        {GoButton(goText)}
+      <div id="discription-container">
+        <div className="discription">{description}</div>
       </div>
-      <div className="discription">{description}</div>
+      {TextInput(placeholder)}
+      {GoButton(goText)}
     </div>
   );
 }

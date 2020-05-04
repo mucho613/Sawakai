@@ -8,7 +8,8 @@ export const PasswordInputModal: VNode = (
   <div id="password-input-modal">
     {TextInputModal(
       "ワールド内でワンタイムパスワードが通知されました。",
-      "次へ"
+      "通話に参加",
+      "パスワード"
     )}
   </div>
 );
