@@ -1,5 +1,5 @@
 import { Reducer } from "@cycle/state";
-import { Stream } from "xstream";
+import xs, { Stream } from "xstream";
 
 // 使い方:
 // const V = tuple('A', 'B');
@@ -29,3 +29,14 @@ export const toReducer: <T>(s0: T) => (f: Endo<T>) => Reducer<T> = (s0) => (
 export type Streamed<T extends Record<string, unknown>> = {
   [P in keyof T]: Stream<T[P]>;
 };
+
+export function unstreamed<T extends Record<string, unknown>>(
+  a: Streamed<T>
+): Stream<T> {
+  const combined$: Stream<unknown[]> = xs.combine(...Object.values(a));
+  const ks: string[] = Object.keys(a);
+  const zipped$: Stream<[string, unknown][]> = combined$.map((c) =>
+    c.map((v, i) => [ks[i], v] as [string, unknown])
+  );
+  return zipped$.map(Object.fromEntries);
+}

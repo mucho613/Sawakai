@@ -2,7 +2,8 @@ import xs, { Stream } from "xstream";
 import fromEvent from "xstream/extra/fromEvent";
 import { Component } from "../types";
 import * as SkyWay from "skyway-js";
-import Peer from "skyway-js";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const Peer = require("skyway-js");
 
 export type RoomID = string;
 function toString(id: RoomID): string {
@@ -76,11 +77,26 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
         },
       });
 
-      type DataObject = { src: PeerID; data: Record<string, unknown> };
-      const peerJoin$: Stream<PeerID> = fromEvent(room, "peerJoin");
+      type DataObject = { src: PeerID; data: string };
       const peerLeave$: Stream<PeerID> = fromEvent(room, "peerLeave");
+      peerLeave$.subscribe({
+        next: (id) => {
+          console.log("peerLeave: " + id);
+        },
+      });
+      const peerJoin$: Stream<PeerID> = fromEvent(room, "peerJoin");
+      peerJoin$.subscribe({
+        next: (id) => {
+          console.log("peerJoin: " + id);
+        },
+      });
       const stream$: Stream<[PeerID, MediaStream]> = fromEvent(room, "stream");
       const data$: Stream<DataObject> = fromEvent(room, "data");
+      data$.subscribe({
+        next: (d) => {
+          console.log("receive data " + d);
+        },
+      });
 
       const connection$: Stream<Connection> = peerJoin$.map((peerID) => {
         const ret: Connection = {
@@ -88,7 +104,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
           updateMediaStream$: stream$
             .filter(([id, _]) => id === peerID)
             .map(([_, s]) => s),
-          json$: data$.filter((d) => d.src === peerID).map((d) => d.data),
+          json$: data$.filter((d) => d.src === peerID).map((d) => JSON.parse(d.data)).debug("json"),
           closing$: peerLeave$.filter((id) => id === peerID).mapTo([]),
         };
         return ret;
@@ -98,7 +114,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       });
     }
 
-    const peer: Peer = new Peer({
+    const peer = new Peer({
       key: "02cc71f9-6aac-4070-8251-037792b2ed60",
     });
     const room$: Stream<SkyWay.SfuRoom> = xs.create();
