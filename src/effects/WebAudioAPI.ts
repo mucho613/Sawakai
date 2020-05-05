@@ -1,7 +1,7 @@
 import { Stream } from "xstream";
 import * as U from "./util";
 import { Component, UserID, Voice, Pose, toString } from "../types";
-import * as AudioAPI from '../effects/WebAudioAPI';
+import * as AudioAPI from "../effects/WebAudioAPI";
 
 export type SpeakerID = string;
 export function toSpeakerID(userID: UserID): SpeakerID {
@@ -42,32 +42,39 @@ export function run<So extends NamedSo, Si extends NamedSi>(
   component: Component<So, Si>
 ): Component<Omit<So, Name>, Omit<Si, Name>> {
   const ctx = new AudioContext();
-  let panners: {[key: string]: PannerNode} = {};
+  const panners: { [key: string]: PannerNode } = {};
   const listener = ctx.listener;
-  return sources => {
-    const sources_ = ..;
-    const sinks = component(sources_);
+  return (sources) => {
+    // const sources_ = ..;
+    // const sinks = component(sources_);
     const sink = getSi(sinks);
     sink.virtualizeInit$.subscribe({
-      next: user => {
+      next: (user) => {
         const speakerNode = ctx.createMediaStreamSource(user.voice);
         const panner = ctx.createPanner();
         panners[user.id] = panner;
         speakerNode.connect(panner);
         panner.connect(ctx.destination);
-      }
+      },
     });
-    sink.virtualizeSpeakerUpdate$.map(spk => {
-      const {pos, faceDir} = spk.pose;
+    sink.virtualizeSpeakerUpdate$.map((spk) => {
+      const { pos, faceDir } = spk.pose;
       panners[spk.id].setPosition(pos.x, pos.y, pos.z);
       panners[spk.id].setPosition(faceDir.x, faceDir.y, faceDir.z);
-    })
-    sink.virtualizeListenerUpdate$.map(lsn => {
-      const {pos, faceDir, headDir} = lsn;
+    });
+    sink.virtualizeListenerUpdate$.map((lsn) => {
+      const { pos, faceDir, headDir } = lsn;
       listener.setPosition(pos.x, pos.y, pos.z);
-      listener.setOrientation(faceDir.x, faceDir.y, faceDir.z, headDir.x, headDir.y, headDir.z);
-    })
-    const sinks_ = ..;
+      listener.setOrientation(
+        faceDir.x,
+        faceDir.y,
+        faceDir.z,
+        headDir.x,
+        headDir.y,
+        headDir.z
+      );
+    });
+    // const sinks_ = ..;
     return sinks_;
   };
 
