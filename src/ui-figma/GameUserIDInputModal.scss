@@ -1,0 +1,10 @@
+#game-user-id-input-modal {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+}
+
+#game-user-id-input-modal.showing {
+  visibility: visible;
+}

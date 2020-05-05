@@ -1,8 +1,9 @@
 import { Stream } from "xstream";
-import { DOMSource, VNode } from "@cycle/dom";
+import { MainDOMSource, VNode } from "@cycle/dom";
 import * as U from "./util";
 
-export type Source = DOMSource;
+// DOMSourcesはeventsが上手くいかない https://github.com/cyclejs/cyclejs/issues/916
+export type Source = MainDOMSource;
 export type Sink = Stream<VNode>;
 
 // --------------------effectのボイラープレート(コピペする)---------------------------
