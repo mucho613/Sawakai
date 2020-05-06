@@ -1,7 +1,9 @@
-import xs, { Stream } from "xstream";
+import xs, { Stream, MemoryStream } from "xstream";
 import fromEvent from "xstream/extra/fromEvent";
 import { Component } from "../types";
 import * as SkyWay from "skyway-js";
+import * as Array from "fp-ts/lib/Array";
+import * as U from "../util";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Peer = require("skyway-js");
 
@@ -12,7 +14,7 @@ function toString(id: RoomID): string {
 function fromString(id: string): RoomID {
   return id;
 }
-type PeerID = string;
+export type PeerID = string;
 
 // TODO: 例外処理
 
@@ -20,11 +22,12 @@ export type Connection = {
   peerID: PeerID;
   updateMediaStream$: Stream<MediaStream>;
   json$: Stream<Record<string, unknown>>;
-  closing$: Stream<[]>;
 };
 
 export type Source = {
-  connection$: Stream<Connection>;
+  connections$: Stream<Connection[]>;
+  data$: Stream<[PeerID, Record<string, unknown>]>;
+  joinOther$: Stream<PeerID>;
 };
 export type Sink = {
   join$: Stream<RoomID>;
@@ -52,13 +55,15 @@ export const nameSi: (so: Si) => NamedSi = (si) => {
 };
 // ---------------------------------------------------------------------------------
 
-type MediaStreamWithPeerID = MediaStream & { peerId: PeerID };
-
 export function run<Sos extends NamedSo, Sis extends NamedSi>(
   component: Component<Sos, Sis>
 ): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
   return function (sources: Omit<Sos, Name>): Omit<Sis, Name> {
-    const so: Source = { connection$: xs.create() };
+    const so: Source = {
+      connections$: xs.create<Connection[]>().startWith([]),
+      data$: xs.create(),
+      joinOther$: xs.create(),
+    };
     const sinks: Sis = component({ ...sources, ...nameSo(so) } as Sos);
     const si: Sink = getSi(sinks);
 
@@ -73,44 +78,81 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       });
       si.sendJSON$.subscribe({
         next: (json: Record<string, unknown>) => {
+          console.log("send JSON: " + json);
           room.send(JSON.stringify(json));
         },
       });
 
       type DataObject = { src: PeerID; data: string };
       const peerLeave$: Stream<PeerID> = fromEvent(room, "peerLeave");
-      peerLeave$.subscribe({
-        next: (id) => {
-          console.log("peerLeave: " + id);
-        },
-      });
       const peerJoin$: Stream<PeerID> = fromEvent(room, "peerJoin");
-      peerJoin$.subscribe({
-        next: (id) => {
-          console.log("peerJoin: " + id);
+      // 既にいるメンバーのpeerJoinは送られてこないがstreamだけは送られてくる
+      const stream$: Stream<SkyWay.RoomStream> = fromEvent(
+        room,
+        "stream"
+      ).remember();
+      stream$.subscribe({
+        next: (d) => {
+          console.log("stream!!!!!!!!!!!!", d);
         },
       });
-      const stream$: Stream<[PeerID, MediaStream]> = fromEvent(room, "stream");
-      const data$: Stream<DataObject> = fromEvent(room, "data");
+      const data$: Stream<DataObject> = fromEvent(room, "data").remember();
       data$.subscribe({
         next: (d) => {
-          console.log("receive data " + d);
+          console.log("received", d);
         },
       });
 
-      const connection$: Stream<Connection> = peerJoin$.map((peerID) => {
-        const ret: Connection = {
-          peerID: peerID,
-          updateMediaStream$: stream$
-            .filter(([id, _]) => id === peerID)
-            .map(([_, s]) => s),
-          json$: data$.filter((d) => d.src === peerID).map((d) => JSON.parse(d.data)).debug("json"),
-          closing$: peerLeave$.filter((id) => id === peerID).mapTo([]),
-        };
-        return ret;
+      const endWhenLeave = (id: PeerID) => <T>(s: Stream<T>): Stream<T> =>
+        s.endWhen(peerLeave$.filter((x) => x == id));
+      const filteredStream = (id: PeerID): Stream<MediaStream> =>
+        stream$
+          .filter((s) => s.peerId == id)
+          .compose(endWhenLeave(id))
+          .map((s): MediaStream => s);
+      const filteredJson = (id: PeerID): Stream<Record<string, unknown>> =>
+        data$
+          .filter((d) => d.src == id)
+          .map((d) => JSON.parse(d.data))
+          .compose(endWhenLeave(id));
+      const mkConnection = (peerID: PeerID): Connection => ({
+        peerID: peerID,
+        updateMediaStream$: filteredStream(peerID),
+        json$: filteredJson(peerID),
       });
-      connection$.subscribe({
-        next: (v) => so.connection$.shamefullySendNext(v),
+
+      type ConDataDef = { joinMaybe: PeerID; leave: PeerID };
+      const conDataProxy = U.proxy<ConDataDef>();
+      const con$: Stream<U.Sum<ConDataDef>> = xs.merge(
+        peerJoin$.map(U.mkSumV(conDataProxy)("joinMaybe")),
+        stream$.map((s) => s.peerId).map(U.mkSumV(conDataProxy)("joinMaybe")),
+        peerLeave$.map(U.mkSumV(conDataProxy)("leave"))
+      );
+      const connections$: Stream<Connection[]> = con$.fold(
+        (acc: Connection[], v) =>
+          U.caseOf(conDataProxy)(v)({
+            joinMaybe: (id) =>
+              acc.find((c) => c.peerID == id)
+                ? acc
+                : acc.concat([mkConnection(id)]),
+            leave: (id) => acc.filter((c) => id != c.peerID),
+          }),
+        []
+      );
+
+      connections$.subscribe({
+        next: (x) => {
+          so.connections$.shamefullySendNext(x);
+        },
+      });
+      data$.subscribe({
+        next: (d) => so.data$.shamefullySendNext([d.src, JSON.parse(d.data)]),
+      });
+      peerJoin$.subscribe({
+        next: (x) => {
+          so.joinOther$.shamefullySendNext(x);
+          console.log("peerJoin next", x);
+        },
       });
     }
 
@@ -121,7 +163,8 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
     si.join$.subscribe({
       next: (roomID: RoomID) => {
         const strID = toString(roomID);
-        room$.shamefullySendNext(peer.joinRoom(strID, { mode: "sfu" }));
+        const room = peer.joinRoom(strID, { mode: "sfu" });
+        room$.shamefullySendNext(room);
       },
     });
     room$.subscribe({ next: withRoom });
