@@ -4,7 +4,7 @@
       "plugin:@typescript-eslint/recommended",
       "plugin:@typescript-eslint/eslint-recommended",
       "plugin:@typescript-eslint/recommended-requiring-type-checking",
-  
+
       "plugin:prettier/recommended",
       "prettier/@typescript-eslint"
     ],
@@ -19,6 +19,6 @@
         "project": "./tsconfig.json"
     },
     "rules": {
-      "indent": ["error", 2]
+      //"prettier": ["error", 2]
     }
   }

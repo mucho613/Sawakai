@@ -1,17 +1,17 @@
-import xs, { Stream } from "xstream";
+import xs, { Stream, MemoryStream } from "xstream";
 import flattenConcurrently from "xstream/extra/flattenConcurrently";
 import sampleCombine from "xstream/extra/sampleCombine";
 import * as D from "@cycle/dom";
 import { Reducer } from "@cycle/state";
 import * as Snabbdom from "snabbdom-pragma";
-import { Position, Quaternion, Voice, UserData, UserID } from "../types";
+import * as T from "../types";
 import * as DOM from "../effects/DOM";
 import * as SkyWay from "../effects/SkyWaySFU";
 import * as StateE from "../effects/State";
 // import * as UCon from "../effects/UserConnections";
 import * as U from "../util";
 import { WorldIDInputModal } from "../ui-figma/WorldIDInputModal";
-import { isGameData } from "../json-schema/GameData.validator";
+import { isGameData, GameData } from "../json-schema/GameData.validator";
 import {
   isGameIDNotice,
   GameIDNotice,
@@ -22,7 +22,7 @@ import { GameUserIDInputModal } from "../ui-figma/GameUserIDInputModal";
 export type State = {
   showingWID: boolean;
   showingGID: boolean;
-  userIDs: UserID[];
+  userIDs: T.UserID[];
 };
 
 // type SourcesMock = DOM.NamedSo &
@@ -35,22 +35,14 @@ export type State = {
 type Sources = DOM.NamedSo & SkyWay.NamedSo;
 type Sinks = DOM.NamedSi & SkyWay.NamedSi;
 
-function toVoice(mediaStream: MediaStream): Voice {
+function toVoice(mediaStream: MediaStream): T.Voice {
   return mediaStream;
 }
 
-function toUserData(c: SkyWay.Connection): U.Streamed<UserData> {
-  return {
-    userID: xs.of(c.peerID),
-    gameUserID: c.json$.filter(isGameIDNotice).map((g) => g.gameUserID),
-    voice: c.updateMediaStream$.map(toVoice),
-  };
-}
-
-function isNotBottom<T>(a: T | null | undefined): a is T {
+function isNotBottom<T>(a: T | null | undefined | never): a is T {
   return a != null && a != undefined;
 }
-function dropBottoms<T>(s: Stream<T | null | undefined>): Stream<T> {
+function dropBottoms<T>(s: Stream<T | null | undefined | never>): Stream<T> {
   return s.filter(isNotBottom);
 }
 function isHTMLInputElement(a: unknown): a is HTMLInputElement {
@@ -77,13 +69,31 @@ function toJSON(gid: string): GameIDNotice {
 export function App(sources: Sources): Sinks {
   const domSo = DOM.getSo(sources);
   const skywaySo = SkyWay.getSo(sources);
-  // TODO: ユーザー減った時の処理
-  // TODO: 人が入ってきたら毎回ID送る
-  // TODO: ゲームデータの入力
-  const users$: Stream<U.Streamed<UserData>[]> = skywaySo.connection$.fold(
-    (acc: U.Streamed<UserData>[], c) => acc.concat(toUserData(c)),
-    []
-  ).debug("users");
+  const gameData$: Stream<GameData> = skywaySo.data$
+    .map(([_, d]) => d)
+    .filter(isGameData);
+  type UserData = {
+    gameUserID: string;
+    voice: T.Voice;
+  };
+  const convUD = (
+    c: SkyWay.Connection
+  ): [SkyWay.PeerID, U.Streamed<UserData>] => [
+    c.peerID,
+    {
+      gameUserID: c.json$.filter(isGameIDNotice).map((d) => d.gameUserID),
+      voice: c.updateMediaStream$,
+    },
+  ];
+  const userList$: Stream<
+    [SkyWay.PeerID, U.Streamed<UserData>][]
+  > = skywaySo.connections$.map((l) => l.map(convUD));
+  const _userIDs$: Stream<Stream<T.GameUserID>[]> = userList$.map((l) =>
+    l.map((d) => d[1].gameUserID)
+  );
+  const userIDs$: Stream<T.GameUserID[]> = flattenConcurrently(
+    _userIDs$.map((l) => xs.combine(...l))
+  );
   const doneWID$ = domSo
     .select("#world-id-input-modal .go-button button")
     .events("click");
@@ -106,21 +116,17 @@ export function App(sources: Sources): Sinks {
     .map((e) => e.target)
     .filter(isHTMLInputElement)
     .map((t) => t.value);
-  const uss: Stream<Stream<string>[]> = users$.map((us) =>
-    us.map((d) => d.gameUserID)
-  ).debug("us");
   const streamedState: U.Streamed<State> = {
-    showingWID: doneWID$.mapTo(false).startWith(true),
-    showingGID: xs
-      .merge(doneWID$.mapTo(true), doneGID$.mapTo(false))
-      .startWith(false),
-    userIDs: flattenConcurrently(uss.map((l) => xs.combine(...l))).debug("userIds"),
+    showingWID: showingWID$,
+    showingGID: showingGID$,
+    userIDs: userIDs$,
   };
-  const state: Stream<State> = U.unstreamed(streamedState).debug("state");
+  const state: Stream<State> = U.unstreamed(streamedState);
   const domSi: DOM.Sink = state.map(view);
   const skywaySi: SkyWay.Sink = {
-    join$: doneWID$.compose(sampleCombine(inputWID$)).map((p) => p[1]),
-    sendJSON$: doneGID$
+    join$: sampleCombine(inputWID$)(doneWID$).map((p) => p[1]),
+    sendJSON$: xs
+      .merge(doneGID$, skywaySo.joinOther$)
       .compose(sampleCombine(inputGID$))
       .map((p) => p[1])
       .map((gid) => toJSON(gid) as Record<string, unknown>),

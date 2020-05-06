@@ -13,6 +13,7 @@ export const ajv = new Ajv({
   useDefaults: true,
 });
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 ajv.addMetaSchema(require("ajv/lib/refs/json-schema-draft-06.json"));
 
 export { GameData };
