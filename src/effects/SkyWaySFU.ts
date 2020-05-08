@@ -4,6 +4,7 @@ import { Component } from "../types";
 import * as SkyWay from "skyway-js";
 import * as Array from "fp-ts/lib/Array";
 import * as U from "../util";
+import sampleCombine from "xstream/extra/sampleCombine";
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const Peer = require("skyway-js");
 
@@ -25,9 +26,13 @@ export type Connection = {
 };
 
 export type Source = {
+  // TODO: joinOtherとかいらないのでは？
+  connection$: Stream<Connection>;
   connections$: Stream<Connection[]>;
   data$: Stream<[PeerID, Record<string, unknown>]>;
+  stream$: Stream<[PeerID, MediaStream]>;
   joinOther$: Stream<PeerID>;
+  leaveOther$: Stream<PeerID>;
 };
 export type Sink = {
   join$: Stream<RoomID>;
@@ -60,42 +65,35 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
 ): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
   return function (sources: Omit<Sos, Name>): Omit<Sis, Name> {
     const so: Source = {
+      connection$: xs.create(),
       connections$: xs.create<Connection[]>().startWith([]),
       data$: xs.create(),
+      stream$: xs.create(),
       joinOther$: xs.create(),
+      leaveOther$: xs.create(),
     };
     const sinks: Sis = component({ ...sources, ...nameSo(so) } as Sos);
     const si: Sink = getSi(sinks);
 
     function withRoom(room: SkyWay.SfuRoom): void {
-      const userStream$ = xs.fromPromise(
-        navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-      );
-      userStream$.subscribe({
-        next: (userStream: MediaStream) => {
-          room.replaceStream(userStream);
-        },
-      });
       si.sendJSON$.subscribe({
         next: (json: Record<string, unknown>) => {
-          console.log("send JSON: " + json);
+          console.log("send JSON: ", json);
           room.send(JSON.stringify(json));
         },
       });
 
       type DataObject = { src: PeerID; data: string };
-      const peerLeave$: Stream<PeerID> = fromEvent(room, "peerLeave");
-      const peerJoin$: Stream<PeerID> = fromEvent(room, "peerJoin");
+      const peerLeave$: Stream<PeerID> = fromEvent(room, "peerLeave").debug(
+        "peerLeave"
+      );
+      const peerJoin$: Stream<PeerID> = fromEvent(room, "peerJoin").debug(
+        "peerJoin"
+      );
       // 既にいるメンバーのpeerJoinは送られてこないがstreamだけは送られてくる
-      const stream$: Stream<SkyWay.RoomStream> = fromEvent(
-        room,
-        "stream"
-      ).remember();
-      stream$.subscribe({
-        next: (d) => {
-          console.log("stream!!!!!!!!!!!!", d);
-        },
-      });
+      const stream$: Stream<SkyWay.RoomStream> = fromEvent(room, "stream")
+        .remember()
+        .debug("stream!!!!!!!!!!!!!");
       const data$: Stream<DataObject> = fromEvent(room, "data").remember();
       data$.subscribe({
         next: (d) => {
@@ -148,11 +146,20 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       data$.subscribe({
         next: (d) => so.data$.shamefullySendNext([d.src, JSON.parse(d.data)]),
       });
+      stream$.subscribe({
+        next: (s) => {
+          so.stream$.shamefullySendNext([s.peerId, s]);
+          so.connection$.shamefullySendNext(mkConnection(s.peerId));
+        },
+      });
       peerJoin$.subscribe({
         next: (x) => {
           so.joinOther$.shamefullySendNext(x);
-          console.log("peerJoin next", x);
         },
+      });
+
+      peerLeave$.subscribe({
+        next: (x) => so.leaveOther$.shamefullySendNext(x),
       });
     }
 
@@ -160,14 +167,26 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       key: "02cc71f9-6aac-4070-8251-037792b2ed60",
     });
     const room$: Stream<SkyWay.SfuRoom> = xs.create();
-    si.join$.subscribe({
-      next: (roomID: RoomID) => {
+    const userStream$ = xs.fromPromise(
+      navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+    );
+    xs.combine(userStream$, si.join$).subscribe({
+      next: ([stream, roomID]) => {
         const strID = toString(roomID);
-        const room = peer.joinRoom(strID, { mode: "sfu" });
+        const room = peer.joinRoom(strID, { mode: "sfu", stream: stream });
         room$.shamefullySendNext(room);
       },
     });
+
     room$.subscribe({ next: withRoom });
+    room$.subscribe({
+      next: (room) => {
+        room.on("stream", (s) => {
+          console.log("stream2!!!!!!!!!");
+        });
+        console.log("start stream observe");
+      },
+    });
 
     return { ...sinks };
   };

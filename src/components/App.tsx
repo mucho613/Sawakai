@@ -17,12 +17,15 @@ import {
   GameIDNotice,
 } from "../json-schema/GameIDNotice.validator";
 import { GameUserIDInputModal } from "../ui-figma/GameUserIDInputModal";
+import * as AudioAPI from "../effects/WebAudioAPI";
+import tween from "xstream/extra/tween";
 
 // 状態はなるべく一箇所に固めない
 export type State = {
   showingWID: boolean;
   showingGID: boolean;
   userIDs: T.UserID[];
+  streams: MediaStream[];
 };
 
 // type SourcesMock = DOM.NamedSo &
@@ -32,8 +35,8 @@ export type State = {
 //   UCon.NamedSi &
 //   /*Game.NamedSi & Audio.NamedSi & */ StateE.NamedSi<State>;
 
-type Sources = DOM.NamedSo & SkyWay.NamedSo;
-type Sinks = DOM.NamedSi & SkyWay.NamedSi;
+type Sources = DOM.NamedSo & SkyWay.NamedSo & AudioAPI.NamedSo;
+type Sinks = DOM.NamedSi & SkyWay.NamedSi & AudioAPI.NamedSi;
 
 function toVoice(mediaStream: MediaStream): T.Voice {
   return mediaStream;
@@ -51,6 +54,7 @@ function isHTMLInputElement(a: unknown): a is HTMLInputElement {
 
 function view(s: State): D.VNode {
   const userView: D.VNode[] = s.userIDs.map((id) => <h1>{id}</h1>);
+  // const audios = s.streams.
   return (
     <div>
       {userView}
@@ -66,28 +70,105 @@ function toJSON(gid: string): GameIDNotice {
   };
 }
 
+function shamefullySendGameMock(s: Stream<GameData>): void {
+  const t$ = xs.periodic(100).map((x) => x * (100 / 1000));
+  const theta$ = t$.map((t) => (Math.PI * 2 * t) / 5);
+  theta$.subscribe({
+    next: (t) => {
+      s.shamefullySendNext({
+        gameUserID: "listener",
+        gameClientID: "minecraft",
+        position: {
+          x: 0,
+          y: 0,
+          z: 0,
+        },
+        faceDirection: {
+          x: Math.cos(t),
+          y: Math.sin(t),
+          z: 0,
+        },
+        upDirection: {
+          x: 0,
+          y: 0,
+          z: 1,
+        },
+      });
+    },
+  });
+
+  setInterval(() => {
+    s.shamefullySendNext({
+      gameUserID: "listener",
+      gameClientID: "minecraft",
+      position: {
+        x: 0,
+        y: 0,
+        z: 0,
+      },
+      faceDirection: {
+        x: 0,
+        y: 1,
+        z: 0,
+      },
+      upDirection: {
+        x: 0,
+        y: 0,
+        z: 1,
+      },
+    });
+  }, 1000);
+  setInterval(() => {
+    s.shamefullySendNext({
+      gameUserID: "speaker",
+      gameClientID: "minecraft",
+      position: {
+        x: 1,
+        y: 0,
+        z: 0,
+      },
+      faceDirection: {
+        x: 0,
+        y: -1,
+        z: 0,
+      },
+      upDirection: {
+        x: 0,
+        y: 0,
+        z: 1,
+      },
+    });
+  }, 1000);
+}
+
 export function App(sources: Sources): Sinks {
   const domSo = DOM.getSo(sources);
   const skywaySo = SkyWay.getSo(sources);
   const gameData$: Stream<GameData> = skywaySo.data$
     .map(([_, d]) => d)
     .filter(isGameData);
+  shamefullySendGameMock(gameData$);
+
   type UserData = {
     gameUserID: string;
     voice: T.Voice;
   };
-  const convUD = (
+  const convUD = (debug: string) => (
     c: SkyWay.Connection
   ): [SkyWay.PeerID, U.Streamed<UserData>] => [
     c.peerID,
     {
       gameUserID: c.json$.filter(isGameIDNotice).map((d) => d.gameUserID),
-      voice: c.updateMediaStream$,
+      voice: c.updateMediaStream$.debug(debug),
     },
   ];
+  const user$: Stream<[
+    SkyWay.PeerID,
+    U.Streamed<UserData>
+  ]> = skywaySo.connection$.map(convUD("each gameUserID stream")).debug("user");
   const userList$: Stream<
     [SkyWay.PeerID, U.Streamed<UserData>][]
-  > = skywaySo.connections$.map((l) => l.map(convUD));
+  > = skywaySo.connections$.map((l) => l.map(convUD("")));
   const _userIDs$: Stream<Stream<T.GameUserID>[]> = userList$.map((l) =>
     l.map((d) => d[1].gameUserID)
   );
@@ -120,18 +201,82 @@ export function App(sources: Sources): Sinks {
     showingWID: showingWID$,
     showingGID: showingGID$,
     userIDs: userIDs$,
+    streams: flattenConcurrently(
+      userList$.map((l) => xs.combine(...l.map(([_, ud]) => ud.voice)))
+    ),
   };
+  const sample = <S,>(sampler: Stream<S>) => <T,>(data: Stream<T>): Stream<T> =>
+    sampleCombine(data)(sampler).map(([_, d]) => d);
+  const myWID$ = sample(doneWID$)(inputWID$);
+  const myGID$ = sample(doneGID$)(inputGID$);
   const state: Stream<State> = U.unstreamed(streamedState);
   const domSi: DOM.Sink = state.map(view);
   const skywaySi: SkyWay.Sink = {
-    join$: sampleCombine(inputWID$)(doneWID$).map((p) => p[1]),
+    join$: myWID$,
     sendJSON$: xs
-      .merge(doneGID$, skywaySo.joinOther$)
-      .compose(sampleCombine(inputGID$))
-      .map((p) => p[1])
+      .merge(sample(skywaySo.joinOther$)(myGID$), myGID$)
       .map((gid) => toJSON(gid) as Record<string, unknown>),
   };
-  return { ...DOM.nameSi(domSi), ...SkyWay.nameSi(skywaySi) };
+  const addSpeaker$ = flattenConcurrently(
+    user$.map(([_, d]) =>
+      xs
+        .combine(d.gameUserID, d.voice)
+        .map(([gid, voice]) => ({ id: gid, voice: voice }))
+    )
+  );
+  addSpeaker$.subscribe({
+    next: (x) => {
+      console.log("aaaaaaaaaaaaaaaa", x);
+    },
+  });
+
+  const audioSi: AudioAPI.Sink = {
+    virtualizeAddSpeaker$: addSpeaker$.debug("add speaker"),
+    virtualizeRemoveSpeaker$: user$
+      .map(([_, d]) => d.gameUserID.last())
+      .flatten()
+      .debug("remove speaker"),
+    virtualizeListenerUpdate$: xs
+      .combine(gameData$, myGID$)
+      // .debug("combined gameData")
+      .filter(([gd, id]) => gd.gameUserID === id)
+      .map(([gd, _]) => gd)
+      .map((gd) => ({
+        faceDir: gd.faceDirection,
+        headDir: gd.upDirection,
+        pos: gd.position,
+      })),
+    // .debug("update listener position"),
+    virtualizeSpeakerUpdate$: xs
+      .combine(gameData$, myGID$)
+      .filter(([gd, id]) => gd.gameUserID !== id)
+      .map(([gd, _]) => gd)
+      .map((gd) => ({
+        id: gd.gameUserID,
+        pose: {
+          faceDir: gd.faceDirection,
+          headDir: gd.upDirection,
+          pos: gd.position,
+        },
+      })),
+    // .debug("update speaker position"),
+  };
+
+  // 副作用!!!!
+  // const audioElem = domSo.select("audio").element();
+  // sampleCombine(audioElem)(addSpeaker$.map((o) => o.voice)).subscribe({
+  //   next: ([s, e]) => {
+  //     (e as HTMLAudioElement).srcObject = s;
+  //     console.log("add audio!!!!!!!!!");
+  //   },
+  // });
+  // --------------------
+
+  return {
+    ...DOM.nameSi(domSi),
+    ...SkyWay.nameSi(skywaySi),
+    ...AudioAPI.nameSi(audioSi),
+  };
 }
 
 // export function AppMockInner(sources: SourcesMock): SinksMock {

@@ -46,6 +46,7 @@
     "xstream": "^11.11.0"
   },
   "dependencies": {
+    "@cycle/xstream-run": "^4.2.0",
     "fp-ts": "^2.5.4"
   }
 }
