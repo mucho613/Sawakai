@@ -1,18 +1,15 @@
 import { Stream } from "xstream";
-import * as U from "./util";
 import { Component, UserID, Voice, Pose, toString } from "../types";
-import * as AudioAPI from "../effects/WebAudioAPI";
 
 export type SpeakerID = string;
 export function toSpeakerID(userID: UserID): SpeakerID {
   return toString(userID);
 }
 
-export type Source = {
-  virtualized$: Stream<{ id: SpeakerID; voice: Voice }>;
-};
+export type Source = {};
 export type Sink = {
-  virtualizeInit$: Stream<{ id: SpeakerID; voice: Voice }>;
+  virtualizeAddSpeaker$: Stream<{ id: SpeakerID; voice: Voice }>;
+  virtualizeRemoveSpeaker$: Stream<SpeakerID>;
   virtualizeSpeakerUpdate$: Stream<{ id: SpeakerID; pose: Pose }>;
   virtualizeListenerUpdate$: Stream<Pose>;
 };
@@ -38,45 +35,81 @@ export const nameSi: (so: Si) => NamedSi = (si) => {
 };
 // ---------------------------------------------------------------------------------
 
-export function run<So extends NamedSo, Si extends NamedSi>(
-  component: Component<So, Si>
-): Component<Omit<So, Name>, Omit<Si, Name>> {
-  const ctx = new AudioContext();
+export function run<Sos extends NamedSo, Sis extends NamedSi>(
+  component: Component<Sos, Sis>
+): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
+  let ctx: AudioContext | null = null;
+  const speakerNodes: { [key: string]: MediaStreamTrackAudioSourceNode } = {};
   const panners: { [key: string]: PannerNode } = {};
-  const listener = ctx.listener;
+  let listener: AudioListener | null = null;
   return (sources) => {
-    // const sources_ = ..;
-    // const sinks = component(sources_);
+    const source: Source = {};
+    const sinks = component({ ...sources, ...nameSo(source) } as Sos);
     const sink = getSi(sinks);
-    sink.virtualizeInit$.subscribe({
-      next: (user) => {
-        const speakerNode = ctx.createMediaStreamSource(user.voice);
+    sink.virtualizeAddSpeaker$.subscribe({
+      next: (spk) => {
+        if (Object.keys(speakerNodes).length === 0) {
+          ctx = new AudioContext();
+          listener = ctx.listener;
+        }
+        if (!ctx || !listener) throw new Error("AudioContext is not ready.");
+        if (spk.id in speakerNodes) {
+          speakerNodes[spk.id].disconnect();
+          delete speakerNodes[spk.id];
+          panners[spk.id].disconnect();
+          delete panners[spk.id];
+        }
+
+        const audio = new Audio();
+        audio.srcObject = spk.voice;
+        audio.play();
+        audio.muted = true;
+
         const panner = ctx.createPanner();
-        panners[user.id] = panner;
-        speakerNode.connect(panner);
-        panner.connect(ctx.destination);
+        panners[spk.id] = panner;
+        const speakerNode = ctx.createMediaElementSource(audio);
+        speakerNodes[spk.id] = speakerNode;
+
+        speakerNode.connect(ctx.destination);
+        // panner.connect(ctx.destination);
       },
     });
-    sink.virtualizeSpeakerUpdate$.map((spk) => {
-      const { pos, faceDir } = spk.pose;
-      panners[spk.id].setPosition(pos.x, pos.y, pos.z);
-      panners[spk.id].setPosition(faceDir.x, faceDir.y, faceDir.z);
+    sink.virtualizeRemoveSpeaker$.subscribe({
+      next: (spkId) => {
+        if (!ctx || !listener) throw new Error("AudioContext is not ready.");
+        speakerNodes[spkId].disconnect();
+        delete speakerNodes[spkId];
+        panners[spkId].disconnect();
+        delete panners[spkId];
+      },
     });
-    sink.virtualizeListenerUpdate$.map((lsn) => {
-      const { pos, faceDir, headDir } = lsn;
-      listener.setPosition(pos.x, pos.y, pos.z);
-      listener.setOrientation(
-        faceDir.x,
-        faceDir.y,
-        faceDir.z,
-        headDir.x,
-        headDir.y,
-        headDir.z
-      );
+    sink.virtualizeSpeakerUpdate$.subscribe({
+      next: (spk) => {
+        if (ctx && panners[spk.id]) {
+          const { pos, faceDir } = spk.pose;
+          panners[spk.id].setPosition(pos.x, pos.y, pos.z);
+          panners[spk.id].setOrientation(faceDir.x, faceDir.y, faceDir.z);
+          console.log("speaker data: ", pos, faceDir);
+        }
+      },
     });
-    // const sinks_ = ..;
-    return sinks_;
+    sink.virtualizeListenerUpdate$.subscribe({
+      next: (lsn) => {
+        if (ctx && listener) {
+          const { pos, faceDir, headDir } = lsn;
+          listener.setPosition(pos.x, pos.y, pos.z);
+          listener.setOrientation(
+            faceDir.x,
+            faceDir.y,
+            faceDir.z,
+            headDir.x,
+            headDir.y,
+            headDir.z
+          );
+          console.log("listener data: ", pos, faceDir, headDir);
+        }
+      },
+    });
+    return { ...sinks };
   };
-
-  throw new Error("not implemented");
 }
