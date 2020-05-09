@@ -61,6 +61,8 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
         }
 
         const panner = ctx.createPanner();
+        panner.panningModel = "HRTF";
+        panner.rolloffFactor = 1.5;
         panners[spk.id] = panner;
         const speakerNode = ctx.createMediaStreamSource(spk.voice);
         speakerNodes[spk.id] = speakerNode;
