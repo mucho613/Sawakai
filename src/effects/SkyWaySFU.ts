@@ -79,11 +79,11 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       si.sendJSON$.subscribe({
         next: (json: Record<string, unknown>) => {
           console.log("send JSON: ", json);
-          room.send(JSON.stringify(json));
+          room.send(json);
         },
       });
 
-      type DataObject = { src: PeerID; data: string };
+      type DataObject = { src: PeerID; data: Record<string, unknown> };
       const peerLeave$: Stream<PeerID> = fromEvent(room, "peerLeave").debug(
         "peerLeave"
       );
@@ -95,7 +95,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
         .remember()
         .debug("stream!!!!!!!!!!!!!");
       const data$: Stream<DataObject> = fromEvent(room, "data").remember();
-      data$.subscribe({
+      data$.take(10).subscribe({
         next: (d) => {
           console.log("received", d);
         },
@@ -111,7 +111,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       const filteredJson = (id: PeerID): Stream<Record<string, unknown>> =>
         data$
           .filter((d) => d.src == id)
-          .map((d) => JSON.parse(d.data))
+          .map((d) => d.data)
           .compose(endWhenLeave(id));
       const mkConnection = (peerID: PeerID): Connection => ({
         peerID: peerID,
@@ -144,7 +144,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
         },
       });
       data$.subscribe({
-        next: (d) => so.data$.shamefullySendNext([d.src, JSON.parse(d.data)]),
+        next: (d) => so.data$.shamefullySendNext([d.src, d.data]),
       });
       stream$.subscribe({
         next: (s) => {
