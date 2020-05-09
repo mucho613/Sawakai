@@ -147,7 +147,12 @@ export function App(sources: Sources): Sinks {
   const gameData$: Stream<GameData> = skywaySo.data$
     .map(([_, d]) => d)
     .filter(isGameData);
-  shamefullySendGameMock(gameData$);
+  // shamefullySendGameMock(gameData$);
+  gameData$.take(10).subscribe({
+    next: (x) => {
+      console.log("gameData$: ", x);
+    },
+  });
 
   type UserData = {
     gameUserID: string;
@@ -230,6 +235,13 @@ export function App(sources: Sources): Sinks {
     },
   });
 
+  xs.combine(gameData$, myGID$)
+    .take(10)
+    .subscribe({
+      next: (x) => {
+        console.log("combined gameData: ", x);
+      },
+    });
   const audioSi: AudioAPI.Sink = {
     virtualizeAddSpeaker$: addSpeaker$.debug("add speaker"),
     virtualizeRemoveSpeaker$: user$

@@ -78,16 +78,18 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
         delete panners[spkId];
       },
     });
+    sink.virtualizeSpeakerUpdate$.take(10).debug("speaker data: ");
     sink.virtualizeSpeakerUpdate$.subscribe({
       next: (spk) => {
         if (ctx && panners[spk.id]) {
           const { pos, faceDir } = spk.pose;
           panners[spk.id].setPosition(pos.x, pos.y, pos.z);
           panners[spk.id].setOrientation(faceDir.x, faceDir.y, faceDir.z);
-          console.log("speaker data: ", pos, faceDir);
+          // console.log("speaker data: ", pos, faceDir);
         }
       },
     });
+    sink.virtualizeListenerUpdate$.take(10).debug("listener data: ");
     sink.virtualizeListenerUpdate$.subscribe({
       next: (lsn) => {
         if (ctx && listener) {
@@ -101,7 +103,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
             headDir.y,
             headDir.z
           );
-          console.log("listener data: ", pos, faceDir, headDir);
+          // console.log("listener data: ", pos, faceDir, headDir);
         }
       },
     });
