@@ -39,7 +39,7 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
   component: Component<Sos, Sis>
 ): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
   let ctx: AudioContext | null = null;
-  const speakerNodes: { [key: string]: MediaStreamTrackAudioSourceNode } = {};
+  const speakerNodes: { [key: string]: MediaStreamAudioSourceNode } = {};
   const panners: { [key: string]: PannerNode } = {};
   let listener: AudioListener | null = null;
   return (sources) => {
@@ -60,18 +60,13 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
           delete panners[spk.id];
         }
 
-        const audio = new Audio();
-        audio.srcObject = spk.voice;
-        audio.play();
-        audio.muted = true;
-
         const panner = ctx.createPanner();
         panners[spk.id] = panner;
-        const speakerNode = ctx.createMediaElementSource(audio);
+        const speakerNode = ctx.createMediaStreamSource(spk.voice);
         speakerNodes[spk.id] = speakerNode;
 
-        speakerNode.connect(ctx.destination);
-        // panner.connect(ctx.destination);
+        speakerNode.connect(panner);
+        panner.connect(ctx.destination);
       },
     });
     sink.virtualizeRemoveSpeaker$.subscribe({
