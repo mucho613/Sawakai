@@ -1,0 +1,10 @@
+#world-id-input-modal {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  visibility: hidden;
+}
+
+#world-id-input-modal.showing {
+  visibility: visible;
+}

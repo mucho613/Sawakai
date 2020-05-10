@@ -1,0 +1,20 @@
+.go-button {
+  button {
+    display: flex;
+    flex-direction: row;
+    padding: 20px 37px;
+
+    background: #C4C4C4;
+    border-radius: 100px;
+
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 36px;
+    line-height: 42px;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: #000000;
+  }
+}

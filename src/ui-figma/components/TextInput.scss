@@ -1,0 +1,24 @@
+.text-input {
+  display: flex;
+  width: 578px;
+  height: 88px;
+  align-items: center;
+  justify-content: center;
+
+  input {
+    padding: 10px;
+    width: 100%;
+    height: 100%;
+
+    background: #FFFFFF;
+    border: 1px solid #000000;
+    box-sizing: border-box;
+    border-radius: 100px;
+
+    text-align: center;
+    font-family: Roboto;
+    font-style: normal;
+    font-weight: normal;
+    font-size: 36px;
+  }
+}
