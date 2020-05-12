@@ -17,29 +17,12 @@ export type Narrowable =
 export const tuple = <T extends Narrowable[]>(...args: T) => args;
 
 export type Endo<T> = (_: T) => T;
-export const toReducer: <T>(s0: T) => (f: Endo<T>) => Reducer<T> = (s0) => (
-  f
-) => {
-  return (s) => {
-    if (s == undefined) return s0;
-    else return f(s);
-  };
+export const toReducerFunc = <T>(s0: T) => (f: Endo<T>): Reducer<T> => {
+  return (s): T => (s ? f(s) : s0);
 };
-
-export type Streamed<T extends Record<string, unknown>> = {
-  [P in keyof T]: Stream<T[P]>;
-};
-
-export function unstreamed<T extends Record<string, unknown>>(
-  a: Streamed<T>
-): Stream<T> {
-  const combined$: Stream<unknown[]> = xs.combine(...Object.values(a));
-  const ks: string[] = Object.keys(a);
-  const zipped$: Stream<[string, unknown][]> = combined$.map((c) =>
-    c.map((v, i) => [ks[i], v] as [string, unknown])
-  );
-  return zipped$.map(Object.fromEntries);
-}
+export const toReducer = <T>(s0: T) => (
+  s: Stream<Endo<T>>
+): Stream<Reducer<T>> => s.map(toReducerFunc(s0)).startWith(() => s0);
 
 export type Proxy<T> = "__proxy" | T;
 export const proxy = <T>(): Proxy<T> => "__proxy";
@@ -70,8 +53,37 @@ export const mkSumV = <Def extends SumDef>(proxy: Proxy<Def>) => <
 ) => (value: Def[K]): Sum<Def> => ({ name: name, value: value });
 export const caseOf = <Def extends SumDef>(proxy: Proxy<Def>) => (
   sum: Sum<Def>
-) => <A>(pattern: { [K in keyof Def]: (_: Def[K]) => A }): A =>
-  pattern[sum.name](sum.value);
+) => <A>(pattern: { [K in keyof Def]: (_: Def[K]) => A }): A => {
+  console.log("caseOf resolve by ", sum.name);
+  return pattern[sum.name](sum.value);
+};
 export const match = <Def extends SumDef>(proxy: Proxy<Def>) => <A>(
   pattern: { [K in keyof Def]: (_: Def[K]) => A }
 ) => (sum: Sum<Def>): A => pattern[sum.name](sum.value);
+
+export type Streamed<T extends Record<string, unknown>> = {
+  [P in keyof T]: Stream<T[P]>;
+};
+
+export function unstreamed<T extends Record<string, unknown>>(
+  a: Streamed<T>
+): Stream<T> {
+  const combined$: Stream<unknown[]> = xs.combine(...Object.values(a));
+  const ks: string[] = Object.keys(a);
+  const zipped$: Stream<[string, unknown][]> = combined$.map((c) =>
+    c.map((v, i) => [ks[i], v] as [string, unknown])
+  );
+  return zipped$.map(Object.fromEntries);
+}
+
+export function unstreamedSum<T extends Record<string, unknown>>(
+  a: Streamed<T>
+): Stream<Sum<T>> {
+  const proxyT: Proxy<T> = proxy();
+  const entries = Object.entries(a) as [keyof T, T[keyof T]][];
+  const sums: Stream<Sum<T>>[] = entries.map(([k, stream]) => {
+    type K = keyof Streamed<T>;
+    return (stream as Streamed<T>[K]).map((v) => mkSumV(proxyT)(k)(v));
+  });
+  return xs.merge(...sums);
+}
