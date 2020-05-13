@@ -147,6 +147,7 @@ function shamefullySendGameMock(s: Stream<GameData>): void {
 export function App(sources: Sources): Sinks {
   const domSo = DOM.getSo(sources);
   const skywaySo = SkyWay.getSo(sources);
+  const audioSo = AudioAPI.getSo(sources);
   const gameData$: Stream<GameData> = skywaySo.data$
     .map(([_, d]) => d)
     .filter(isGameData);
@@ -224,6 +225,7 @@ export function App(sources: Sources): Sinks {
     sendJSON$: xs
       .merge(sample(skywaySo.joinOther$)(myGID$), myGID$)
       .map((gid) => toJSON(gid) as Record<string, unknown>),
+    userStream$: audioSo.normalizedVoice$,
   };
   const addSpeaker$ = flattenConcurrently(
     user$.map(([_, d]) =>
@@ -246,7 +248,8 @@ export function App(sources: Sources): Sinks {
       },
     });
   const audioSi: AudioAPI.Sink = {
-    virtualizeRequest: {
+    initContext$: myWID$.mapTo([]),
+    virtualizeRequest$: {
       addSpeaker: addSpeaker$.debug("add speaker"),
       removeSpeaker: user$
         .map(([_, d]) => d.gameUserID.last())
