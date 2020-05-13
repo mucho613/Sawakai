@@ -35,6 +35,7 @@ export type Source = {
   leaveOther$: Stream<PeerID>;
 };
 export type Sink = {
+  userStream$: Stream<MediaStream>;
   join$: Stream<RoomID>;
   sendJSON$: Stream<Record<string, unknown>>;
 };
@@ -167,11 +168,9 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
       key: "02cc71f9-6aac-4070-8251-037792b2ed60",
     });
     const room$: Stream<SkyWay.SfuRoom> = xs.create();
-    const userStream$ = xs.fromPromise(
-      navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-    );
-    xs.combine(userStream$, si.join$).subscribe({
+    xs.combine(si.userStream$, si.join$).subscribe({
       next: ([stream, roomID]) => {
+        console.log("userStream$: ", stream);
         const strID = toString(roomID);
         const room = peer.joinRoom(strID, { mode: "sfu", stream: stream });
         room$.shamefullySendNext(room);

@@ -22,9 +22,12 @@ export type VirtualizeRequest = {
   updateListener: Pose;
 };
 
-export type Source = {};
+export type Source = {
+  normalizedVoice$: Stream<Voice>;
+};
 export type Sink = {
-  virtualizeRequest: U.Streamed<VirtualizeRequest>;
+  virtualizeRequest$: U.Streamed<VirtualizeRequest>;
+  initContext$: Stream<[]>;
 };
 
 // --------------------effectのボイラープレート(コピペする)---------------------------
@@ -70,9 +73,8 @@ const virtualize = (
     panner.rolloffFactor = 1.5;
     const speakerNode = ctx.createMediaStreamSource(req.voice);
 
-    speakerNode.connect(ctx.destination);
-    // speakerNode.connect(panner);
-    // panner.connect(ctx.destination);
+    speakerNode.connect(panner);
+    panner.connect(ctx.destination);
     return s.concat([
       {
         id: req.id,
@@ -146,19 +148,74 @@ const virtualize = (
   });
 };
 
+const initContext = (): Stream<AudioContext> => {
+  const ctx = new AudioContext();
+  return xs
+    .fromPromise(
+      ctx.audioWorklet
+        .addModule("AudioWorkletProcessor/ForegroundNormalizer.js")
+        .then(() => {
+          console.log("add module");
+        })
+    )
+    .mapTo(ctx);
+};
+
 export function run<Sos extends NamedSo, Sis extends NamedSi>(
   component: Component<Sos, Sis>
 ): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
   return (sources) => {
-    const source: Source = {};
+    const source: Source = { normalizedVoice$: xs.create() };
     const sinks = component({ ...sources, ...nameSo(source) } as Sos);
     const sink = getSi(sinks);
 
-    const vRequestSum$ = U.unstreamedSum(sink.virtualizeRequest);
-    const ctx$: Stream<AudioContext> = vRequestSum$.map(
-      () => new AudioContext()
-    );
-    virtualize(xs.combine(ctx$, vRequestSum$));
+    const vRequestSum$ = U.unstreamedSum(sink.virtualizeRequest$);
+    const ctx$: Stream<AudioContext> = sink.initContext$
+      .map(initContext)
+      .flatten();
+    const normalizedVoice$ = ctx$
+      .map((ctx) =>
+        xs
+          .fromPromise(
+            navigator.mediaDevices.getUserMedia({ video: false, audio: true })
+            // .then((stream) => {
+            //   console.log(ctx.state);
+            //   const src = ctx.createMediaStreamSource(stream);
+            //   src.connect(ctx.destination);
+            //   return stream;
+            //   // const normalizer = new AudioWorkletNode(
+            //   //   ctx,
+            //   //   "foreground-normalizer"
+            //   // );
+            //   // const dst = ctx.createMediaStreamDestination();
+            //   // src.connect(normalizer);
+            //   // normalizer.connect(dst);
+            //   // console.log("initialized normalizer");
+            //   // return dst.stream;
+            // })
+          )
+          .map((stream) => {
+            console.log(ctx.state);
+            const audio = new Audio();
+            const src = ctx.createMediaStreamSource(stream);
+            const normalizer = new AudioWorkletNode(
+              ctx,
+              "foreground-normalizer"
+            );
+            const dst = ctx.createMediaStreamDestination();
+            src.connect(normalizer);
+            normalizer.connect(dst);
+            console.log("initialized normalizer");
+            return dst.stream;
+          })
+      )
+      .flatten();
+    virtualize(xs.combine(ctx$, Op.delayUntil(ctx$)(vRequestSum$)));
+    normalizedVoice$.subscribe({
+      next: (x) => {
+        source.normalizedVoice$.shamefullySendNext(x);
+      },
+    });
     return { ...sinks };
   };
 }
