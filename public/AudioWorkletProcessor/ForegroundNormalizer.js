@@ -1,4 +1,7 @@
 /* eslint-disable */
+
+// 前景音をうまく正規化するAudioWorkletProcessor
+// 人が喋っている音声を想定している
 class ForegroundNormalizer extends AudioWorkletProcessor {
   constructor() {
     super();
@@ -7,7 +10,7 @@ class ForegroundNormalizer extends AudioWorkletProcessor {
     this.itr = 0;
 
     // ヒストグラムの半減期(音圧レベルがharflife個届いたら半減)
-    // 大きいと安定するが反応が鈍くなる
+    // 大きいと正規化が安定するが反応が鈍くなる
     // 時間単位の半減期 = capacity * harfLife / (サンプリングレート)
     this.harfLife = 1000;
 
