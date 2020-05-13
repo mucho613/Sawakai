@@ -59,7 +59,7 @@ class ForegroundNormalizer extends AudioWorkletProcessor {
     return array.reduce((acc, v) => Math.max(acc, Math.abs(v)));
   }
 
-  // f: (v: T, i: number) => T
+  // f: (v: number, i: number) => number
   sumHist(f) {
     return this.levelHist.reduce((acc, v, i) => acc + f(v, i), 0);
   }
