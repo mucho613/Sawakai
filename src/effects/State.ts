@@ -1,6 +1,7 @@
 import { Stream } from "xstream";
 import { StateSource, Reducer, withState } from "@cycle/state";
 import { Component } from "../types";
+import { run as cycleRun } from "@cycle/run";
 
 export type Source<State> = StateSource<State>;
 export type Sink<State> = Stream<Reducer<State>>;
@@ -37,3 +38,13 @@ export function run<
 >(component: Component<Sos, Sis>): Component<Omit<Sos, Name>, Omit<Sis, Name>> {
   return withState<Sos, Sis, State, Name>(component, name);
 }
+
+export const runSimple = <State>(
+  component: Component<Source<State>, Sink<State>>
+): void => {
+  withState<NamedSo<State>, NamedSi<State>, State, Name>((namedSo) => {
+    const so = getSo(namedSo);
+    const si = component(so);
+    return nameSi(si);
+  }, name)({});
+};

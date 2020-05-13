@@ -19,6 +19,9 @@ import {
 import { GameUserIDInputModal } from "../ui-figma/GameUserIDInputModal";
 import * as AudioAPI from "../effects/WebAudioAPI";
 import tween from "xstream/extra/tween";
+import * as Op from "../StreamOperators";
+import split from "xstream/extra/split";
+import buffer from "xstream/extra/buffer";
 
 // 状態はなるべく一箇所に固めない
 export type State = {
@@ -243,36 +246,66 @@ export function App(sources: Sources): Sinks {
       },
     });
   const audioSi: AudioAPI.Sink = {
-    virtualizeAddSpeaker$: addSpeaker$.debug("add speaker"),
-    virtualizeRemoveSpeaker$: user$
-      .map(([_, d]) => d.gameUserID.last())
-      .flatten()
-      .debug("remove speaker"),
-    virtualizeListenerUpdate$: xs
-      .combine(gameData$, myGID$)
-      // .debug("combined gameData")
-      .filter(([gd, id]) => gd.gameUserID === id)
-      .map(([gd, _]) => gd)
-      .map((gd) => ({
-        faceDir: gd.faceDirection,
-        headDir: gd.upDirection,
-        pos: gd.position,
-      })),
-    // .debug("update listener position"),
-    virtualizeSpeakerUpdate$: xs
-      .combine(gameData$, myGID$)
-      .filter(([gd, id]) => gd.gameUserID !== id)
-      .map(([gd, _]) => gd)
-      .map((gd) => ({
-        id: gd.gameUserID,
-        pose: {
+    virtualizeRequest: {
+      addSpeaker: addSpeaker$.debug("add speaker"),
+      removeSpeaker: user$
+        .map(([_, d]) => d.gameUserID.last())
+        .flatten()
+        .debug("remove speaker"),
+      updateListener: xs
+        .combine(gameData$, myGID$)
+        // .debug("combined gameData")
+        .filter(([gd, id]) => gd.gameUserID === id)
+        .map(([gd, _]) => gd)
+        .map((gd) => ({
           faceDir: gd.faceDirection,
           headDir: gd.upDirection,
           pos: gd.position,
-        },
-      })),
-    // .debug("update speaker position"),
+        })),
+      updateSpeaker: xs
+        .combine(gameData$, myGID$)
+        .filter(([gd, id]) => gd.gameUserID !== id)
+        .map(([gd, _]) => gd)
+        .map((gd) => ({
+          id: gd.gameUserID,
+          pose: {
+            faceDir: gd.faceDirection,
+            headDir: gd.upDirection,
+            pos: gd.position,
+          },
+        })),
+    },
   };
+  // virtualizeAddSpeaker$: addSpeaker$.debug("add speaker"),
+  // virtualizeRemoveSpeaker$: user$
+  //   .map(([_, d]) => d.gameUserID.last())
+  //   .flatten()
+  //   .debug("remove speaker"),
+  // virtualizeListenerUpdate$: xs
+  //   .combine(gameData$, myGID$)
+  //   // .debug("combined gameData")
+  //   .filter(([gd, id]) => gd.gameUserID === id)
+  //   .map(([gd, _]) => gd)
+  //   .map((gd) => ({
+  //     faceDir: gd.faceDirection,
+  //     headDir: gd.upDirection,
+  //     pos: gd.position,
+  //   })),
+  // // .debug("update listener position"),
+  // virtualizeSpeakerUpdate$: xs
+  //   .combine(gameData$, myGID$)
+  //   .filter(([gd, id]) => gd.gameUserID !== id)
+  //   .map(([gd, _]) => gd)
+  //   .map((gd) => ({
+  //     id: gd.gameUserID,
+  //     pose: {
+  //       faceDir: gd.faceDirection,
+  //       headDir: gd.upDirection,
+  //       pos: gd.position,
+  //     },
+  //   })),
+  // .debug("update speaker position"),
+  // };
 
   // 副作用!!!!
   // const audioElem = domSo.select("audio").element();
