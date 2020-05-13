@@ -70,9 +70,8 @@ const virtualize = (
     panner.rolloffFactor = 1.5;
     const speakerNode = ctx.createMediaStreamSource(req.voice);
 
-    speakerNode.connect(ctx.destination);
-    // speakerNode.connect(panner);
-    // panner.connect(ctx.destination);
+    speakerNode.connect(panner);
+    panner.connect(ctx.destination);
     return s.concat([
       {
         id: req.id,
