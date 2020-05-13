@@ -178,21 +178,6 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
         xs
           .fromPromise(
             navigator.mediaDevices.getUserMedia({ video: false, audio: true })
-            // .then((stream) => {
-            //   console.log(ctx.state);
-            //   const src = ctx.createMediaStreamSource(stream);
-            //   src.connect(ctx.destination);
-            //   return stream;
-            //   // const normalizer = new AudioWorkletNode(
-            //   //   ctx,
-            //   //   "foreground-normalizer"
-            //   // );
-            //   // const dst = ctx.createMediaStreamDestination();
-            //   // src.connect(normalizer);
-            //   // normalizer.connect(dst);
-            //   // console.log("initialized normalizer");
-            //   // return dst.stream;
-            // })
           )
           .map((stream) => {
             console.log(ctx.state);
