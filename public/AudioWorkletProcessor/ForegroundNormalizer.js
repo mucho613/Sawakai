@@ -15,7 +15,7 @@ class ForegroundNormalizer extends AudioWorkletProcessor {
     this.harfLife = 1000;
 
     this.a = 1 - 2 ** (-1 / this.harfLife);
-    this.histMin = -100; // 音圧レベルの下限値は -100 dBFS(peak) もあれば余裕
+    this.histMin = -60; // 音圧レベルの下限値 [dBFS(peak)]
     this.histMax = 0;
     this.histBin = 100;
     this.levelHist = new Array(this.histBin); // 音圧レベルのヒストグラムの指数移動平均
@@ -25,7 +25,7 @@ class ForegroundNormalizer extends AudioWorkletProcessor {
 
     this.normalizeRate = 1;
     this.maxNormalizeRate = 20;
-    this.standard = 0.3; // 基準音圧
+    this.standard = 0.08; // 基準音圧
     this.thresholdLevel = 0; // 現状の前景音と背景音の間のしきい値
     this.onlyBackground = false;
 
