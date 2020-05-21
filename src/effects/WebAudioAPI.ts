@@ -73,7 +73,7 @@ const virtualize = (
     if (spk) return s;
     const panner = ctx.createPanner();
     panner.panningModel = "HRTF";
-    panner.rolloffFactor = 1;
+    panner.rolloffFactor = 0.88;
     const speakerNode = ctx.createMediaStreamSource(req.voice);
 
     speakerNode.connect(panner);
@@ -184,17 +184,17 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
             const src = ctx.createMediaStreamSource(stream);
             const normalizerOptions: NormalizerParam.ProcOptions = {
               standardDB: -10,
-              halfLifeSec: 0.5,
+              halfLifeSec: 2.5,
             };
             const compressorOptions: CmpExperParam.ProcOptions = {
               ratio: 1 / 4,
-              thresholdDB: -6,
-              postGainDB: 3,
+              thresholdDB: -10,
+              postGainDB: 2,
             };
             const expanderOptions: CmpExperParam.ProcOptions = {
-              ratio: 2,
+              ratio: 1.65,
               thresholdDB: -130,
-              postGainDB: -130 * (2 - 1),
+              postGainDB: -130 * (1.65 - 1),
             };
             const normalizer = new AudioWorkletNode(
               ctx,
@@ -206,12 +206,17 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
             const expander = new AudioWorkletNode(ctx, "cmp-exper", {
               processorOptions: expanderOptions,
             });
+            const lowcut = ctx.createBiquadFilter();
+            lowcut.type = "lowshelf";
+            lowcut.frequency.value = 250;
+            lowcut.gain.value = -15;
             const dst = ctx.createMediaStreamDestination();
 
             src.connect(normalizer);
             normalizer.connect(compressor);
             compressor.connect(expander);
-            expander.connect(dst);
+            expander.connect(lowcut);
+            lowcut.connect(dst);
             console.log("initialized normalizer");
             return dst.stream;
           })
