@@ -22,6 +22,7 @@ import tween from "xstream/extra/tween";
 import * as Op from "../StreamOperators";
 import split from "xstream/extra/split";
 import buffer from "xstream/extra/buffer";
+import delay from "xstream/extra/delay";
 
 // 状態はなるべく一箇所に固めない
 export type State = {
@@ -167,7 +168,10 @@ export function App(sources: Sources): Sinks {
   ): [SkyWay.PeerID, U.Streamed<UserData>] => [
     c.peerID,
     {
-      gameUserID: c.json$.filter(isGameIDNotice).map((d) => d.gameUserID),
+      gameUserID: c.json$
+        .filter(isGameIDNotice)
+        .map((d) => d.gameUserID)
+        .remember(),
       voice: c.updateMediaStream$.debug(debug),
     },
   ];
@@ -177,13 +181,23 @@ export function App(sources: Sources): Sinks {
   ]> = skywaySo.connection$.map(convUD("each gameUserID stream")).debug("user");
   const userList$: Stream<
     [SkyWay.PeerID, U.Streamed<UserData>][]
-  > = skywaySo.connections$.map((l) => l.map(convUD("")));
-  const _userIDs$: Stream<Stream<T.GameUserID>[]> = userList$.map((l) =>
-    l.map((d) => d[1].gameUserID)
+  > = skywaySo.connections$.map((l) => l.map(convUD(""))).debug("userList$");
+  const _userIDs$ = userList$.map((l) =>
+    l.map(([id, d]) =>
+      d.gameUserID.map<[SkyWay.PeerID, T.GameUserID]>((gid) => [id, gid])
+    )
   );
-  const userIDs$: Stream<T.GameUserID[]> = flattenConcurrently(
-    _userIDs$.map((l) => xs.combine(...l))
-  );
+  // StreamのStreamをflatten()することで子ストリームが流れてくるタイミングの情報が失われ,
+  // 人が減った時のゲームID表示が壊れる。一旦回避策として全体のユーザーリストを使ってフィルタする
+  // 後々StreamのStreamを乱用しないように実装方針を変えたほうが良さそう
+  const userIDs$ = xs
+    .combine(
+      _userIDs$.map((l) => xs.combine(...l)).flatten(),
+      skywaySo.connections$.map((l) => l.map((c) => c.peerID))
+    )
+    .map(([l, ids]) =>
+      l.filter(([id, _]) => ids.includes(id)).map(([_, gid]) => gid)
+    );
   const doneWID$ = domSo
     .select("#world-id-input-modal .go-button button")
     .events("click");
@@ -214,17 +228,16 @@ export function App(sources: Sources): Sinks {
       userList$.map((l) => xs.combine(...l.map(([_, ud]) => ud.voice)))
     ),
   };
-  const sample = <S,>(sampler: Stream<S>) => <T,>(data: Stream<T>): Stream<T> =>
-    sampleCombine(data)(sampler).map(([_, d]) => d);
-  const myWID$ = sample(doneWID$)(inputWID$);
-  const myGID$ = sample(doneGID$)(inputGID$);
+  const myWID$ = Op.sample(doneWID$)(inputWID$);
+  const myGID$ = Op.sample(doneGID$)(inputGID$);
   const state: Stream<State> = U.unstreamed(streamedState);
   const domSi: DOM.Sink = state.map(view);
   const skywaySi: SkyWay.Sink = {
     join$: myWID$,
-    sendJSON$: xs
-      .merge(sample(skywaySo.joinOther$)(myGID$), myGID$)
-      .map((gid) => toJSON(gid) as Record<string, unknown>),
+    // UDPなので届く保証がない & 相手の状態が整う前に送ってしまうケースがあるので、再送する
+    sendJSON$: Op.exponentialRetry(1.5)(500)(
+      xs.merge(Op.sample(skywaySo.joinOther$)(myGID$), myGID$)
+    ).map((gid) => toJSON(gid) as Record<string, unknown>),
     userStream$: audioSo.normalizedVoice$,
   };
   const addSpeaker$ = flattenConcurrently(
@@ -234,19 +247,6 @@ export function App(sources: Sources): Sinks {
         .map(([gid, voice]) => ({ id: gid, voice: voice }))
     )
   );
-  addSpeaker$.subscribe({
-    next: (x) => {
-      console.log("aaaaaaaaaaaaaaaa", x);
-    },
-  });
-
-  xs.combine(gameData$, myGID$)
-    .take(10)
-    .subscribe({
-      next: (x) => {
-        console.log("combined gameData: ", x);
-      },
-    });
   const audioSi: AudioAPI.Sink = {
     initContext$: myWID$.mapTo([]),
     virtualizeRequest$: {
@@ -279,46 +279,6 @@ export function App(sources: Sources): Sinks {
         })),
     },
   };
-  // virtualizeAddSpeaker$: addSpeaker$.debug("add speaker"),
-  // virtualizeRemoveSpeaker$: user$
-  //   .map(([_, d]) => d.gameUserID.last())
-  //   .flatten()
-  //   .debug("remove speaker"),
-  // virtualizeListenerUpdate$: xs
-  //   .combine(gameData$, myGID$)
-  //   // .debug("combined gameData")
-  //   .filter(([gd, id]) => gd.gameUserID === id)
-  //   .map(([gd, _]) => gd)
-  //   .map((gd) => ({
-  //     faceDir: gd.faceDirection,
-  //     headDir: gd.upDirection,
-  //     pos: gd.position,
-  //   })),
-  // // .debug("update listener position"),
-  // virtualizeSpeakerUpdate$: xs
-  //   .combine(gameData$, myGID$)
-  //   .filter(([gd, id]) => gd.gameUserID !== id)
-  //   .map(([gd, _]) => gd)
-  //   .map((gd) => ({
-  //     id: gd.gameUserID,
-  //     pose: {
-  //       faceDir: gd.faceDirection,
-  //       headDir: gd.upDirection,
-  //       pos: gd.position,
-  //     },
-  //   })),
-  // .debug("update speaker position"),
-  // };
-
-  // 副作用!!!!
-  // const audioElem = domSo.select("audio").element();
-  // sampleCombine(audioElem)(addSpeaker$.map((o) => o.voice)).subscribe({
-  //   next: ([s, e]) => {
-  //     (e as HTMLAudioElement).srcObject = s;
-  //     console.log("add audio!!!!!!!!!");
-  //   },
-  // });
-  // --------------------
 
   return {
     ...DOM.nameSi(domSi),
