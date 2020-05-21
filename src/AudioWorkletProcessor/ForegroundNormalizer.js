@@ -1,4 +1,4 @@
-/* eslint-disable */
+// /* eslint-disable */
 
 // 前景音をうまく正規化するAudioWorkletProcessor
 // 人が喋っている音声を想定している
@@ -25,7 +25,7 @@ class ForegroundNormalizer extends AudioWorkletProcessor {
 
     this.normalizeRate = 1;
     this.maxNormalizeRate = 20;
-    this.standard = 0.08; // 基準音圧
+    this.standard = this.levelToPressure(-20); // 基準音圧
     this.thresholdLevel = 0; // 現状の前景音と背景音の間のしきい値
     this.onlyBackground = false;
 
@@ -152,7 +152,10 @@ class ForegroundNormalizer extends AudioWorkletProcessor {
     // if (this.cntUpdate % 100 == 0)
     //   console.log("前景音の大きさ(dBFS peak)", foregroundLevel);
 
-    this.normalizeRate = Math.min(this.standard / foreground, this.maxNormalizeRate);
+    this.normalizeRate = Math.min(
+      this.standard / foreground,
+      this.maxNormalizeRate
+    );
 
     // if (this.cntUpdate % 100 == 0) console.log(this.normalizeRate);
 
