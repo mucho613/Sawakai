@@ -10,6 +10,7 @@ import { Option, some, none } from "fp-ts/lib/Option";
 import * as Op from "../StreamOperators";
 import * as StateE from "./State";
 import * as CmpExperParam from "../AudioWorkletProcessor/CmpExperParam";
+import * as NormalizerParam from "../AudioWorkletProcessor/ForegroundNormalizerParam";
 
 export type SpeakerID = string;
 export function toSpeakerID(userID: UserID): SpeakerID {
@@ -181,23 +182,36 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
             console.log(ctx.state);
             const audio = new Audio();
             const src = ctx.createMediaStreamSource(stream);
+            const normalizerOptions: NormalizerParam.ProcOptions = {
+              standardDB: -10,
+              halfLifeSec: 0.5,
+            };
+            const compressorOptions: CmpExperParam.ProcOptions = {
+              ratio: 1 / 4,
+              thresholdDB: -6,
+              postGainDB: 3,
+            };
+            const expanderOptions: CmpExperParam.ProcOptions = {
+              ratio: 2,
+              thresholdDB: -130,
+              postGainDB: -130 * (2 - 1),
+            };
             const normalizer = new AudioWorkletNode(
               ctx,
               "foreground-normalizer"
             );
-            const compressorOptions: CmpExperParam.ProcOptions = {
-              ratio: 1.65,
-              thresholdLevel: -130,
-              postGainDB: -130 * (1.65 - 1),
-            };
             const compressor = new AudioWorkletNode(ctx, "cmp-exper", {
               processorOptions: compressorOptions,
+            });
+            const expander = new AudioWorkletNode(ctx, "cmp-exper", {
+              processorOptions: expanderOptions,
             });
             const dst = ctx.createMediaStreamDestination();
 
             src.connect(normalizer);
             normalizer.connect(compressor);
-            compressor.connect(dst);
+            compressor.connect(expander);
+            expander.connect(dst);
             console.log("initialized normalizer");
             return dst.stream;
           })

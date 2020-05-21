@@ -55,7 +55,7 @@ const audioWorkletProcessorConfig = {
   target: "webworker",
   entry: {
     "AudioWorkletProcessor/ForegroundNormalizer":
-      "./src/AudioWorkletProcessor/ForegroundNormalizer.js",
+      "./src/AudioWorkletProcessor/ForegroundNormalizer.ts",
     "AudioWorkletProcessor/CmpExper": "./src/AudioWorkletProcessor/CmpExper.ts",
   },
   devServer: {
