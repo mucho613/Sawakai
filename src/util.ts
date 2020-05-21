@@ -87,3 +87,14 @@ export function unstreamedSum<T extends Record<string, unknown>>(
   });
   return xs.merge(...sums);
 }
+
+export const toRequired = <T>(dflt: Required<T>) => (
+  p: Partial<T> | undefined
+): Required<T> => {
+  if (!p) return dflt;
+  const entries = Object.entries(dflt) as [keyof T, Required<T>[keyof T]][];
+  const ret = entries.map(
+    ([k, v]) => [k, p[k] ? p[k] : v] as [keyof T, Required<T>[keyof T]]
+  );
+  return (Object.fromEntries(ret) as unknown) as Required<T>;
+};

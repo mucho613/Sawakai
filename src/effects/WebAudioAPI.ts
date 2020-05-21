@@ -9,6 +9,7 @@ import sampleCombine from "xstream/extra/sampleCombine";
 import { Option, some, none } from "fp-ts/lib/Option";
 import * as Op from "../StreamOperators";
 import * as StateE from "./State";
+import * as CmpExperParam from "../AudioWorkletProcessor/CmpExperParam";
 
 export type SpeakerID = string;
 export function toSpeakerID(userID: UserID): SpeakerID {
@@ -37,6 +38,7 @@ type Si = Sink;
 
 import { Named } from "./util";
 import { tuple } from "../util";
+import { CmpExper } from "../AudioWorkletProcessor/CmpExper";
 const name_ = tuple(name);
 export type Name = typeof name_[number];
 export type NamedSo = Named<Name, So>;
@@ -70,7 +72,7 @@ const virtualize = (
     if (spk) return s;
     const panner = ctx.createPanner();
     panner.panningModel = "HRTF";
-    panner.rolloffFactor = 1.5;
+    panner.rolloffFactor = 1;
     const speakerNode = ctx.createMediaStreamSource(req.voice);
 
     speakerNode.connect(panner);
@@ -150,15 +152,11 @@ const virtualize = (
 
 const initContext = (): Stream<AudioContext> => {
   const ctx = new AudioContext();
-  return xs
-    .fromPromise(
-      ctx.audioWorklet
-        .addModule("AudioWorkletProcessor/ForegroundNormalizer.js")
-        .then(() => {
-          console.log("add module");
-        })
-    )
-    .mapTo(ctx);
+  const promises = [
+    ctx.audioWorklet.addModule("AudioWorkletProcessor/ForegroundNormalizer.js"),
+    ctx.audioWorklet.addModule("AudioWorkletProcessor/CmpExper.js"),
+  ];
+  return xs.combine(...promises.map((p) => xs.fromPromise(p))).mapTo(ctx);
 };
 
 export function run<Sos extends NamedSo, Sis extends NamedSi>(
@@ -187,9 +185,19 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
               ctx,
               "foreground-normalizer"
             );
+            const compressorOptions: CmpExperParam.ProcOptions = {
+              ratio: 1.65,
+              thresholdLevel: -130,
+              postGainDB: -130 * (1.65 - 1),
+            };
+            const compressor = new AudioWorkletNode(ctx, "cmp-exper", {
+              processorOptions: compressorOptions,
+            });
             const dst = ctx.createMediaStreamDestination();
+
             src.connect(normalizer);
-            normalizer.connect(dst);
+            normalizer.connect(compressor);
+            compressor.connect(dst);
             console.log("initialized normalizer");
             return dst.stream;
           })
