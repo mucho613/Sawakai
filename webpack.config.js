@@ -1,20 +1,23 @@
 const MODE = "development";
 const enabledSourceMap = MODE === "development";
 
-const path = require('path');
-const outputPath = path.resolve(__dirname, 'public');
+const path = require("path");
+const outputPath = path.resolve(__dirname, "public");
 
-module.exports = {
+const mainConfig = {
   mode: MODE,
-  entry: './src/index.ts',
+  entry: "./src/index.ts",
   devServer: {
-    contentBase: outputPath
+    contentBase: outputPath,
+    // inlineモードだとAudioWorkletProcessorのバンドルにHMRのモジュールが挿入され、
+    // AudioAPIがProcessorを読み込んだときにエラーが出る...
+    inline: false,
   },
   module: {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: "ts-loader",
       },
       {
         test: /\.scss/,
@@ -25,24 +28,56 @@ module.exports = {
             options: {
               url: false,
               sourceMap: enabledSourceMap,
-              importLoaders: 2
-            }
+              importLoaders: 2,
+            },
           },
           {
             loader: "sass-loader",
             options: {
-              sourceMap: enabledSourceMap
-            }
-          }
-        ]
-      }
+              sourceMap: enabledSourceMap,
+            },
+          },
+        ],
+      },
     ],
   },
   output: {
     path: `${__dirname}/public`,
-    filename: "main.js"
+    filename: "main.js",
   },
   resolve: {
-    extensions: [".ts", ".tsx", ".js", ".json"]
-  }
+    extensions: [".ts", ".tsx", ".js", ".json"],
+  },
 };
+
+const audioWorkletProcessorConfig = {
+  mode: MODE,
+  target: "webworker",
+  entry: {
+    "AudioWorkletProcessor/ForegroundNormalizer":
+      "./src/AudioWorkletProcessor/ForegroundNormalizer.ts",
+    "AudioWorkletProcessor/CmpExper": "./src/AudioWorkletProcessor/CmpExper.ts",
+  },
+  devServer: {
+    contentBase: outputPath,
+  },
+  output: {
+    path: `${__dirname}/public`,
+    filename: "[name].js",
+    globalObject: "this",
+  },
+  resolve: {
+    extensions: [".ts", ".js"],
+  },
+  module: {
+    rules: [
+      {
+        test: /\.ts$/,
+        use: "ts-loader",
+        exclude: /node_modules/,
+      },
+    ],
+  },
+};
+
+module.exports = [mainConfig, audioWorkletProcessorConfig];
