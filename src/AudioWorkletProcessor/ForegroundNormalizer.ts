@@ -145,7 +145,7 @@ class ForegroundNormalizer extends AudioWorkletProcessor
 
     // 背景音の割合が大きいとき正規化係数の更新を避ける
     if (foregroundSize < backgroundSize * 0.1) {
-      console.log("喋ってねえよ");
+      // console.log("喋ってねえよ");
       return;
     }
 
