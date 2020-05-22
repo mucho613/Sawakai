@@ -32,7 +32,6 @@ class ForegroundNormalizer extends AudioWorkletProcessor
   readonly maxNormalizeRatio = 20;
   normalizeRatio = 1;
   thresholdDB: number = this.histMin;
-  onlyBackground = false;
 
   // 背景音からbackgroundRange[dB]以内は背景音とみなし、それ以上の値を元に正規化する
   // 小さすぎる音を前景音として誤認するのを防ぐため
@@ -112,12 +111,6 @@ class ForegroundNormalizer extends AudioWorkletProcessor
     //   console.log("volumeIdx: ", volumeIdx);
     // }
 
-    // 背景音しかないとき何も更新したくない
-    if (this.onlyBackground && volumeDB <= this.thresholdDB) {
-      // console.log("喋ってねえよ");
-      return;
-    }
-
     // 指数移動平均を更新
     for (let i = 0; i < this.histBin; i++) this.levelHist[i] *= 1 - this.a;
     // if (this.cntUpdate % 100 == 0) {
@@ -149,10 +142,12 @@ class ForegroundNormalizer extends AudioWorkletProcessor
     const backgroundSize = this.sumHist((v, i) =>
       this.idx2dB(i) < this.thresholdDB ? v : 0
     );
-    // 背景音の割合が大きすぎないか調べる
-    this.onlyBackground = foregroundSize < backgroundSize * 0.1;
 
-    if (foregroundSize == 0) return; // 以降計算不能なので既存値を使う
+    // 背景音の割合が大きいとき正規化係数の更新を避ける
+    if (foregroundSize < backgroundSize * 0.1) {
+      console.log("喋ってねえよ");
+      return;
+    }
 
     // 前景音レベルの代表値を算出する(現状は平均値)
     const foregroundLevel =
@@ -164,10 +159,13 @@ class ForegroundNormalizer extends AudioWorkletProcessor
     // if (this.cntUpdate % 100 == 0)
     //   console.log("前景音の大きさ(dBFS)", foregroundLevel);
 
-    this.normalizeRatio = Math.min(
-      dB2lin(this.param.standardDB) / foreground,
-      this.maxNormalizeRatio
-    );
+    const normalizeRatio = dB2lin(this.param.standardDB) / foreground;
+    if (!normalizeRatio || isNaN(normalizeRatio) || normalizeRatio <= 0) {
+      console.log("warning: 音声の正規化が一時的に失敗");
+      return;
+    }
+
+    this.normalizeRatio = Math.min(normalizeRatio, this.maxNormalizeRatio);
 
     // if (this.cntUpdate % 100 == 0) console.log(this.normalizeRate);
   }
