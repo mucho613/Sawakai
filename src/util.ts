@@ -98,3 +98,15 @@ export const toRequired = <T>(dflt: Required<T>) => (
   );
   return (Object.fromEntries(ret) as unknown) as Required<T>;
 };
+
+// mean 平均
+// sd 標準僅差
+export const normalDistribution = (sd: number) => (mean: number): number => {
+  const x = Math.random();
+  const y = Math.random();
+
+  const z1 = Math.sqrt(-2 * Math.log(x)) * Math.cos(2 * Math.PI * y);
+  // const z2 = Math.sqrt(-2 * Math.log(x)) * Math.sin(2 * Math.PI * y);
+
+  return mean + z1 * sd;
+};
