@@ -1,16 +1,12 @@
 import xs, { Stream } from "xstream";
 import { Component, UserID, Voice, Pose, toString } from "../types";
 import * as U from "../util";
-import buffer from "xstream/extra/buffer";
-import concat from "xstream/extra/concat";
-import flattenSequentially from "xstream/extra/flattenSequentially";
-import split from "xstream/extra/split";
-import sampleCombine from "xstream/extra/sampleCombine";
-import { Option, some, none } from "fp-ts/lib/Option";
 import * as Op from "../StreamOperators";
+import * as ArrayLib from "fp-ts/lib/Array";
 import * as StateE from "./State";
 import * as CmpExperParam from "../AudioWorkletProcessor/CmpExperParam";
 import * as NormalizerParam from "../AudioWorkletProcessor/ForegroundNormalizerParam";
+import * as WhiteNoiseParam from "../AudioWorkletProcessor/WhiteNoiseParam";
 
 export type SpeakerID = string;
 export function toSpeakerID(userID: UserID): SpeakerID {
@@ -53,6 +49,18 @@ export const nameSi: (so: Si) => NamedSi = (si) => {
   return { [name]: si };
 };
 // ---------------------------------------------------------------------------------
+
+// 周期1の信号sを周波数と初期位相をずらして足し合わせることでランダムっぽい振動を作る
+// sは0~1で定義すれば自動で周期化される
+// 典型的には s(x) = sin(2*pi*x)
+const randomVibration = (fs: number[]) => (p0s: number[]) => (
+  s: (t: number) => number
+) => (t: number): number => {
+  const perioded = (t: number): number => s(t - Math.floor(t));
+  return ArrayLib.zipWith(fs, p0s, (f, p) => perioded(f * t + p)).reduce(
+    (acc, x) => acc + x
+  );
+};
 
 const virtualize = (
   stream$: Stream<[AudioContext, U.Sum<VirtualizeRequest>]>
@@ -156,8 +164,81 @@ const initContext = (): Stream<AudioContext> => {
   const promises = [
     ctx.audioWorklet.addModule("AudioWorkletProcessor/ForegroundNormalizer.js"),
     ctx.audioWorklet.addModule("AudioWorkletProcessor/CmpExper.js"),
+    ctx.audioWorklet.addModule("AudioWorkletProcessor/WhiteNoise.js"),
   ];
   return xs.combine(...promises.map((p) => xs.fromPromise(p))).mapTo(ctx);
+};
+
+const groundNoise = (ctx: AudioContext): AudioNode => {
+  const whiteNoiseOptions: WhiteNoiseParam.ProcOptions = {
+    gain: 10,
+  };
+  const whiteNoise = new AudioWorkletNode(ctx, "white-noise", {
+    processorOptions: whiteNoiseOptions,
+  });
+  const fl = 200;
+  const fr = 800;
+  const decay = ctx.createBiquadFilter();
+  decay.type = "bandpass";
+  decay.frequency.value = 20;
+  decay.Q.value = 7.5;
+  const highShelf = ctx.createBiquadFilter();
+  highShelf.type = "highshelf";
+  highShelf.frequency.value = 400;
+  highShelf.gain.value = -15;
+  const lowshelf = ctx.createBiquadFilter();
+  lowshelf.type = "lowshelf";
+  lowshelf.frequency.value = 25;
+  lowshelf.gain.value = -40;
+  const delay = ctx.createDelay();
+  delay.delayTime.value = 1;
+  const peaking = ctx.createBiquadFilter();
+  peaking.type = "peaking";
+  peaking.frequency.value = fl;
+  peaking.gain.value = 0;
+  peaking.Q.value = 1;
+
+  const genGain = () => {
+    const periods = [5, 9, 17, 31, 67];
+    const fs = periods.map((x) => 1 / x);
+    const p0s = fs.map(() => Math.random());
+    const gain$ = xs
+      .periodic(3000)
+      .map((t) => randomVibration(fs)(p0s)((t) => Math.sin(t) - 0.5)(t * 3))
+      .map((x) => Math.max(0, x * 35));
+    return gain$;
+  };
+  const gain$ = genGain();
+  gain$.subscribe({
+    next: (g) => {
+      // console.log("gain: ", g);
+      peaking.gain.linearRampToValueAtTime(g, ctx.currentTime + 3);
+    },
+  });
+  const genFreq = () => {
+    const periods = [31, 47, 73, 97];
+    const fs = periods.map((x) => 1 / x);
+    const p0s = fs.map(() => Math.random());
+    const freq$ = xs
+      .periodic(3000)
+      .map((t) => randomVibration(fs)(p0s)((t) => Math.sin(t) - 0.5)(t * 3))
+      .map((x) => fl * Math.exp(Math.log(fr / fl) * (x + 1)));
+    return freq$;
+  };
+  const freq$ = genFreq();
+  freq$.subscribe({
+    next: (f) => {
+      // console.log("frequency", f);
+      peaking.frequency.exponentialRampToValueAtTime(f, ctx.currentTime + 3);
+    },
+  });
+
+  whiteNoise.connect(decay);
+  decay.connect(highShelf);
+  highShelf.connect(lowshelf);
+  lowshelf.connect(peaking);
+  peaking.connect(delay);
+  return delay;
 };
 
 export function run<Sos extends NamedSo, Sis extends NamedSi>(
@@ -172,6 +253,12 @@ export function run<Sos extends NamedSo, Sis extends NamedSi>(
     const ctx$: Stream<AudioContext> = sink.initContext$
       .map(initContext)
       .flatten();
+    ctx$.subscribe({
+      next: (ctx) => {
+        const gn = groundNoise(ctx);
+        gn.connect(ctx.destination);
+      },
+    });
     const normalizedVoice$ = ctx$
       .map((ctx) =>
         xs
