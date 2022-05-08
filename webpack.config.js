@@ -57,6 +57,8 @@ const audioWorkletProcessorConfig = {
     "AudioWorkletProcessor/ForegroundNormalizer":
       "./src/AudioWorkletProcessor/ForegroundNormalizer.ts",
     "AudioWorkletProcessor/CmpExper": "./src/AudioWorkletProcessor/CmpExper.ts",
+    "AudioWorkletProcessor/WhiteNoise":
+      "./src/AudioWorkletProcessor/WhiteNoise.ts",
   },
   devServer: {
     contentBase: outputPath,

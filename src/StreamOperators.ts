@@ -58,3 +58,8 @@ export const exponentialRetry = (rate: number) => (firstDelay: number) => <T>(
       return b$.mapTo(sig);
     })
     .flatten();
+
+export const withElapsedTime = <T>(s: Stream<T>): Stream<[T, number]> => {
+  const start = performance.now();
+  return s.map((x) => [x, performance.now() - start]);
+};
